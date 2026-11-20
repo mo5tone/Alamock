@@ -1,0 +1,53 @@
+# SwiftLint configuration for Alamock.
+#
+# Formatting is owned by swift-format (see `.swift-format`); SwiftLint polices the
+# rules a formatter cannot express. Run both through `make lint` / `make verify`.
+
+included:
+  - Sources
+  - Tests
+  - Package.swift
+
+excluded:
+  - .build
+  - .swiftpm
+
+# swift-format's `multiElementCollectionTrailingCommas` writes trailing commas into
+# multi-element collection literals, so this rule would disagree on every run.
+disabled_rules:
+  - trailing_comma
+  # Flags `class func canInit(with:)`-style overrides on URLProtocol, where Swift
+  # forbids `static` because the superclass method is overridable.
+  - static_over_final_class
+  # Wants `String(bytes:encoding:)` instead of `String(decoding:as:)`. Test fixtures are
+  # UTF-8 by construction, so the non-optional decoder is the clearer choice here.
+  - optional_data_string_conversion
+
+line_length:
+  warning: 120
+  error: 160
+
+# Matchers and response builders are branch-heavy by nature; keep a ceiling that
+# still catches runaway functions.
+cyclomatic_complexity:
+  warning: 15
+  error: 25
+
+file_length:
+  warning: 700
+  error: 1200
+  ignore_comment_only_lines: true
+
+type_body_length:
+  warning: 700
+  error: 1200
+
+function_body_length:
+  warning: 60
+  error: 120
+
+identifier_name:
+  min_length:
+    warning: 1
+  max_length:
+    warning: 50
