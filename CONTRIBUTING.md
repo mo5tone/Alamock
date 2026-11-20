@@ -229,10 +229,11 @@ the commit body. Every commit in the branch is still validated by CI: run
 `scripts/validate-conventional-commits.sh --range origin/main..HEAD` before pushing. Later
 fixups can disappear in the squash, but the branch has to be green as pushed.
 
-`main` is not branch-protected today, so the CI checks are advisory rather than required.
-Turning on branch protection with the four checks (*Build & test*, *Lint & format*,
-*Conventional Commits*, *Validate PR title*) is the recommended next step; it is a
-repository setting, not something a pull request can change.
+`main` is protected: a pull request is required, and the four checks (*Build & test*,
+*Lint & format*, *Conventional Commits*, *Validate PR title*) must pass before it can
+merge. The repository owner keeps a bypass for emergencies, and the bypass is recorded
+in the branch protection audit log; direct pushes to `main` run the push CI but skip
+the pull-request gates, so use them only when that trade-off is intentional.
 
 ## Project layout
 
