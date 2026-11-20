@@ -21,7 +21,7 @@ import Foundation
 /// // Anything goes:
 /// mock.on(.post, "/raw").matchingBody(.predicate { $0?.count == 16 })
 /// ```
-public struct MockBodyMatcher: @unchecked Sendable, CustomStringConvertible {
+public struct MockBodyMatcher: Sendable, CustomStringConvertible {
     enum Kind {
         case data(Data)
         case text(String)

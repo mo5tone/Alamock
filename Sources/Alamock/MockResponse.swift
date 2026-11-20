@@ -19,7 +19,7 @@ import Foundation
 /// mock.on(.get, "/slow").respond(.json([:]).delayed(by: 0.5))
 /// mock.on(.get, "/offline").respond(.error(.notConnectedToInternet))
 /// ```
-public struct MockResponse: @unchecked Sendable {
+public struct MockResponse: Sendable {
     /// The HTTP status code of the emulated response.
     public var statusCode: Int
 

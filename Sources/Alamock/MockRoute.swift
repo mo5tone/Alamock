@@ -226,7 +226,7 @@ public final class MockRoute: @unchecked Sendable, CustomStringConvertible {
 
 // MARK: - Responder
 
-private struct MockResponder: @unchecked Sendable {
+private struct MockResponder: Sendable {
     let respond: @Sendable (RecordedRequest) throws -> MockResponse
 
     static let `default` = MockResponder { _ in MockResponse(statusCode: 200) }

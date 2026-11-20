@@ -21,7 +21,7 @@ import Foundation
 /// )
 /// XCTAssertTrue(matcher.matches(recordedRequest))
 /// ```
-public struct RequestMatcher: @unchecked Sendable, CustomStringConvertible {
+public struct RequestMatcher: Sendable, CustomStringConvertible {
     /// The required HTTP method, or `nil` to accept any method.
     public var method: HTTPMethod?
 

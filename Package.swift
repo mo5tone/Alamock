@@ -35,5 +35,5 @@ let package = Package(
             path: "Tests/AlamockTests"
         ),
     ],
-    swiftLanguageModes: [.v5]
+    swiftLanguageModes: [.v6]
 )

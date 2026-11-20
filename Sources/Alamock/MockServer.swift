@@ -7,7 +7,7 @@ import Alamofire
 import Foundation
 
 /// What a ``MockServer`` does with a request that matches no registered route.
-public enum UnmatchedRequestBehavior: @unchecked Sendable {
+public enum UnmatchedRequestBehavior: Sendable {
     /// Respond with an HTTP `500` diagnostic response listing the registered routes.
     ///
     /// This is the default: unmatched requests never reach the network, so a missing stub

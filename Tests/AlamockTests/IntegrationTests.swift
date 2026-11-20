@@ -535,10 +535,15 @@ final class IntegrationTests: XCTestCase {
             .json(["id": request.pathParameters["id"]!])
         }
 
+        // Capture the session locally: `addTask` takes a `sending` closure, and `self`
+        // (an XCTestCase) is not `Sendable`. `Session` is `@unchecked Sendable`, so the
+        // local copy can cross into the task group safely.
+        let session = try XCTUnwrap(self.session)
+
         let ids = try await withThrowingTaskGroup(of: String.self) { group in
             for index in 0..<20 {
                 group.addTask {
-                    try await self.session.request("https://api.example.com/items/\(index)")
+                    try await session.request("https://api.example.com/items/\(index)")
                         .serializingDecodable([String: String].self)
                         .value["id"]!
                 }
