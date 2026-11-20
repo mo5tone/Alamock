@@ -1,0 +1,9 @@
+# actionlint configuration.
+#
+# `xcode-27` is a GitHub-hosted macOS 27 preview image (runner-images issue 14404);
+# actionlint's bundled label list only knows the generally available images, so it
+# reports the label as unknown. Declaring it here keeps `actionlint` a clean gate —
+# it is linter metadata only and does not change how GitHub schedules the job.
+self-hosted-runner:
+  labels:
+    - xcode-27

@@ -5,33 +5,170 @@ on:
     branches: [main]
   pull_request:
 
+# A newer push to the same branch makes the previous run obsolete.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Read-only by design: no job in this workflow writes to the repository.
+permissions:
+  contents: read
+
+env:
+  # Toolchain pins. `make format-check` compares swift-format output, so CI has to run
+  # the exact versions CONTRIBUTING.md documents — a different formatter build reports
+  # unrelated drift and the gate stops meaning anything. Each job asserts these values
+  # and fails with an actionable message instead of silently formatting with a
+  # different toolchain.
+  PINNED_XCODE: "27.2"
+  PINNED_SWIFT: "6.4.2"
+  PINNED_SWIFT_FORMAT: "6.4.4"
+
 jobs:
-  build-and-test:
+  build-test:
     name: Build & test
-    runs-on: macos-15
-    timeout-minutes: 20
+    # The `xcode-27` image is the only GitHub-hosted image that carries Xcode 27.x.
+    # It is a public preview for now; see README "Continuous integration" for the
+    # fallback if the label or the pinned Xcode disappears.
+    runs-on: xcode-27
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Show toolchain
+      - name: Pin toolchain
         run: |
-          swift --version
-          xcodebuild -version
+          set -euo pipefail
+          xcode="/Applications/Xcode_${PINNED_XCODE}.app"
+          if [[ ! -d "$xcode" ]]; then
+            echo "::error::Xcode ${PINNED_XCODE} is missing from this runner image. Update PINNED_* in .github/workflows/ci.yml."
+            ls -d /Applications/Xcode*.app 2>/dev/null || true
+            exit 1
+          fi
+          sudo xcode-select -s "$xcode"
+
+          xcode_version="$(xcodebuild -version | sed -n '1s/^Xcode //p')"
+          swift_version="$(swift --version 2>&1 | sed -n 's/.*Swift version \([0-9][0-9.]*\).*/\1/p' | head -1)"
+          format_version="$(xcrun swift-format --version | head -1 | tr -d '[:space:]')"
+          echo "xcode=${xcode_version} swift=${swift_version} swift-format=${format_version}"
+
+          [[ "$xcode_version" == "$PINNED_XCODE" ]] \
+            || { echo "::error::Xcode drift: pinned ${PINNED_XCODE}, found ${xcode_version}."; exit 1; }
+          [[ "$swift_version" == "$PINNED_SWIFT" ]] \
+            || { echo "::error::Swift drift: pinned ${PINNED_SWIFT}, found ${swift_version}."; exit 1; }
+          [[ "$format_version" == "$PINNED_SWIFT_FORMAT" ]] \
+            || { echo "::error::swift-format drift: pinned ${PINNED_SWIFT_FORMAT}, found ${format_version}."; exit 1; }
+
+      - name: Cache SwiftPM build
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: ${{ runner.os }}-${{ runner.arch }}-swiftpm-swift${{ env.PINNED_SWIFT }}-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-swiftpm-swift${{ env.PINNED_SWIFT }}-
 
       - name: Build (debug)
         run: swift build
 
+      - name: Test (debug, parallel)
+        run: swift test --parallel
+
       - name: Build (release)
         run: swift build -c release
 
-      - name: Test (debug)
-        run: swift test --parallel
+  lint:
+    name: Lint & format
+    runs-on: xcode-27
+    timeout-minutes: 15
 
-      - name: Test (release)
-        run: swift test -c release --parallel
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Pin toolchain
+        run: |
+          set -euo pipefail
+          xcode="/Applications/Xcode_${PINNED_XCODE}.app"
+          if [[ ! -d "$xcode" ]]; then
+            echo "::error::Xcode ${PINNED_XCODE} is missing from this runner image. Update PINNED_* in .github/workflows/ci.yml."
+            ls -d /Applications/Xcode*.app 2>/dev/null || true
+            exit 1
+          fi
+          sudo xcode-select -s "$xcode"
+
+          xcode_version="$(xcodebuild -version | sed -n '1s/^Xcode //p')"
+          format_version="$(xcrun swift-format --version | head -1 | tr -d '[:space:]')"
+          echo "xcode=${xcode_version} swift-format=${format_version}"
+
+          [[ "$xcode_version" == "$PINNED_XCODE" ]] \
+            || { echo "::error::Xcode drift: pinned ${PINNED_XCODE}, found ${xcode_version}."; exit 1; }
+          [[ "$format_version" == "$PINNED_SWIFT_FORMAT" ]] \
+            || { echo "::error::swift-format drift: pinned ${PINNED_SWIFT_FORMAT}, found ${format_version}."; exit 1; }
+
+      # SwiftLint is not preinstalled on every image and `brew install swiftlint` would
+      # track whatever upstream ships next. Download the pinned release binary instead
+      # and verify its digest, so a lint result can be reproduced exactly.
+      - name: Install pinned SwiftLint
+        env:
+          PINNED_SWIFTLINT: "0.65.1"
+          SWIFTLINT_SHA256: "c1e429b0599cf1b516f369a2d9ec04eaf0e436f3c12b637df8851fa52ff694d0"
+        run: |
+          set -euo pipefail
+          archive="${RUNNER_TEMP}/portable_swiftlint.zip"
+          bin_dir="${RUNNER_TEMP}/swiftlint-${PINNED_SWIFTLINT}"
+          curl --fail --silent --show-error --location \
+            --output "$archive" \
+            "https://github.com/realm/SwiftLint/releases/download/${PINNED_SWIFTLINT}/portable_swiftlint.zip"
+          echo "${SWIFTLINT_SHA256}  ${archive}" | shasum -a 256 --check -
+          unzip -q -o "$archive" -d "$bin_dir"
+          echo "$bin_dir" >> "$GITHUB_PATH"
+          "$bin_dir/swiftlint" version
+
+      - name: Lint (SwiftLint --strict + swift-format)
+        run: |
+          set -euo pipefail
+          swiftlint version
+          make lint
+
+      - name: Format check
+        run: make format-check
+
+  conventional-commits:
+    name: Conventional Commits
+    # Shell and git only: no toolchain, no build, so the cheap runner is enough.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate commit messages
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.event.after }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            # Validate every non-merge commit the pull request adds on top of its base
+            # branch. The validator lives in scripts/, so it is versioned with the repo.
+            git fetch --no-tags --quiet origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+            range="origin/${BASE_REF}..HEAD"
+          elif [[ -n "${BEFORE:-}" && ! "$BEFORE" =~ ^0+$ ]] \
+            && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            range="${BEFORE}..${AFTER}"
+          else
+            # First push to the branch, or a rewritten history: fall back to the whole
+            # range below the checked-out commit.
+            root="$(git rev-list --max-parents=0 HEAD | tail -1)"
+            range="${root}..HEAD"
+          fi
+
+          echo "Validating commit messages in ${range}"
+          ./scripts/validate-conventional-commits.sh --range "$range"

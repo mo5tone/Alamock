@@ -1,5 +1,7 @@
 # Alamock
 
+[![CI](https://github.com/mo5tone/Alamock/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/mo5tone/Alamock/actions/workflows/ci.yml)
+
 A pluggable networking mock for [Alamofire](https://github.com/Alamofire/Alamofire) unit tests.
 
 `Alamock` plugs into `URLSession` through its public `URLProtocol` seam, so it works
@@ -25,7 +27,7 @@ mock.onGet("/users/42").respond(.json(["id": 42, "name": "Ada"]))
 
 | | |
 |---|---|
-| Swift | 6.0+ (package `swift-tools-version: 6.0`) |
+| Swift | 6.0+ (package `swift-tools-version: 6.0`, Swift 6 language mode) |
 | Xcode | 16+ |
 | Alamofire | 5.10+ (built and tested against 5.12.2) |
 | Platforms | macOS 10.15+, iOS 13+, tvOS 13+, watchOS 6+ |
@@ -355,6 +357,12 @@ All public mock types are `Sendable`; route, recording, and behavior state is pr
 locks. Concurrent requests against one server, and parallel test execution with separate
 servers, are safe. `swift test --parallel` passes.
 
+The package is built in **Swift 6 language mode**, so strict concurrency is checked at every
+call site rather than opt-in. Public value types (`MockResponse`, `RequestMatcher`,
+`MockBodyMatcher`, `RecordedRequest`, …) conform to checked `Sendable`; the `@unchecked`
+conformances are limited to the lock-protected reference types (`MockServer`, `MockRoute`,
+`MockServerRegistry`, and the internal response sequence).
+
 ## Limitations
 
 - **Hermetic by design.** Configured sessions never contact a real server.
@@ -379,11 +387,24 @@ servers, are safe. `swift test --parallel` passes.
 
 ## Development
 
+The repository carries its own tooling: [swift-format](.swift-format) formats the
+sources, [SwiftLint](.swiftlint.yml) lints them, and a `Makefile` wraps both plus the
+test suite. Run `make` on its own to list every target.
+
 ```bash
-swift build
-swift test
-swift test --parallel
+make format        # rewrite Sources, Tests and Package.swift with swift-format
+make format-check  # fail if anything is not formatted
+make lint          # SwiftLint --strict + the swift-format check
+make test          # swift test --parallel
+make verify        # everything CI enforces: lint + format check + tests
+make hooks         # install the commit-msg hook (Conventional Commits)
 ```
+
+Formatting and linting are CI gates, so run `make format` before pushing and
+`make verify` before opening a pull request. Commit messages and pull request titles
+follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/); see
+[CONTRIBUTING.md](CONTRIBUTING.md) for the type/scope vocabulary, the hook setup and
+the squash-merge policy.
 
 Test coverage includes routing and matching, response types, sequences, delays,
 cancellation, timeouts, retries, uploads (data/file/multipart), downloads, redirects,
@@ -406,6 +427,45 @@ Sources/Alamock/
 ├── MockError.swift           # mock transport errors (NSError domain)
 └── Internal/                 # locking + weak server registry
 ```
+
+## Continuous integration and releases
+
+Every push to `main` and every pull request runs the workflows in
+[`.github/workflows`](.github/workflows):
+
+| Workflow | Job | What it enforces |
+|---|---|---|
+| [`ci.yml`](.github/workflows/ci.yml) | **Build & test** | `swift build`, `swift test --parallel`, `swift build -c release`. |
+| [`ci.yml`](.github/workflows/ci.yml) | **Lint & format** | `make lint` (SwiftLint `--strict` plus the swift-format check) and `make format-check`. |
+| [`ci.yml`](.github/workflows/ci.yml) | **Conventional Commits** | Every non-merge commit the push or pull request adds, via `scripts/validate-conventional-commits.sh`. |
+| [`pr-title.yml`](.github/workflows/pr-title.yml) | **Validate PR title** | The pull request title, which becomes the squash commit subject on `main`. |
+| [`release.yml`](.github/workflows/release.yml) | **Test & publish** | Release-mode tests, then a GitHub Release for a `vX.Y.Z` tag. |
+
+The toolchain is pinned so that a local `make verify` and CI agree: Xcode 27.2 (Swift
+6.4.2, swift-format 6.4.4) on the GitHub-hosted `xcode-27` image, plus the SwiftLint
+0.65.1 release binary checked against a recorded digest. Each job prints the resolved
+versions and fails with an explicit error when the image drifts — bump the `PINNED_*`
+values in the workflow and the version table in
+[CONTRIBUTING.md](CONTRIBUTING.md#requirements) together. `xcode-27` is a public preview
+image: if it ever stops providing the pinned Xcode, move the jobs to `macos-26` and drop
+the format gate for that pass, rather than letting CI format with a different toolchain.
+
+Releasing is a tag:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+`release.yml` accepts `vMAJOR.MINOR.PATCH` (optionally `-prerelease`/`+build`), runs
+`swift test -c release`, and then publishes a GitHub Release with generated notes for
+that tag. A tag that is not semver, or a failing suite, publishes nothing; no binaries are
+attached, because SwiftPM resolves the package by tag. The version in `Package.swift` is
+not rewritten by the workflow.
+
+Pull requests land as a single squashed commit titled by the pull request title and
+described by its body, so `main` stays a linear list of Conventional Commits. See
+[CONTRIBUTING.md](CONTRIBUTING.md#pull-requests) for the branch, title, and review rules.
 
 ## License
 

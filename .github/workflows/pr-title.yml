@@ -1,0 +1,66 @@
+name: PR title
+
+# The repository squash-merges only, so the pull request title becomes the commit
+# subject on `main`. Validate it with the same rules as commit messages.
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  conventional-title:
+    name: Validate PR title
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      # Check out the base revision: the validator is then the version that `main`
+      # enforces, so a pull request cannot loosen the rules that judge it.
+      - name: Checkout base revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+
+      # Exact parity with the commit-msg hook: header length, type, scope shape,
+      # separator, and the "no trailing period / no double space" rules.
+      - name: Validate the title with the repository validator
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: ./scripts/validate-conventional-commits.sh --text "$PR_TITLE"
+
+      # Same rules again through the GitHub-native action, which annotates the pull
+      # request and exports type/scope/subject outputs for later automation.
+      - name: Validate the title as a Conventional Commit header
+        uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # Keep in sync with the `types` list in scripts/validate-conventional-commits.sh
+          # and the table in CONTRIBUTING.md.
+          types: |
+            feat
+            fix
+            docs
+            style
+            refactor
+            perf
+            test
+            build
+            ci
+            chore
+            revert
+          requireScope: false
+          # Mirrors the validator: the subject is required, does not start with a space
+          # and does not end with a period or whitespace.
+          subjectPattern: ^(?!\s)(?!.*[.\s]$).+$
+          subjectPatternError: |
+            The subject "{subject}" in the pull request title "{title}" breaks the
+            repository rules: keep it imperative, do not start it with a space and do
+            not end it with a period. See CONTRIBUTING.md "Commit messages".

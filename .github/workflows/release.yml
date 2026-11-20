@@ -1,0 +1,79 @@
+name: Release
+
+# Publishing is driven by tags: `git tag v1.2.3 && git push origin v1.2.3`.
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+# One release per tag; never cancel a publishing run halfway through.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  # Same pins as ci.yml: the release must be tested with the toolchain the CI gate
+  # uses, otherwise a release could pass where the gate fails (or the other way round).
+  PINNED_XCODE: "27.2"
+  PINNED_SWIFT: "6.4.2"
+  PINNED_SWIFT_FORMAT: "6.4.4"
+
+jobs:
+  release:
+    name: Test & publish
+    runs-on: xcode-27
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history so `gh release create --generate-notes` can describe the range
+          # since the previous tag from the local clone as well.
+          fetch-depth: 0
+
+      - name: Pin toolchain
+        run: |
+          set -euo pipefail
+          xcode="/Applications/Xcode_${PINNED_XCODE}.app"
+          if [[ ! -d "$xcode" ]]; then
+            echo "::error::Xcode ${PINNED_XCODE} is missing from this runner image. Update PINNED_* in .github/workflows/release.yml."
+            ls -d /Applications/Xcode*.app 2>/dev/null || true
+            exit 1
+          fi
+          sudo xcode-select -s "$xcode"
+
+          xcode_version="$(xcodebuild -version | sed -n '1s/^Xcode //p')"
+          swift_version="$(swift --version 2>&1 | sed -n 's/.*Swift version \([0-9][0-9.]*\).*/\1/p' | head -1)"
+          echo "xcode=${xcode_version} swift=${swift_version}"
+
+          [[ "$xcode_version" == "$PINNED_XCODE" ]] \
+            || { echo "::error::Xcode drift: pinned ${PINNED_XCODE}, found ${xcode_version}."; exit 1; }
+          [[ "$swift_version" == "$PINNED_SWIFT" ]] \
+            || { echo "::error::Swift drift: pinned ${PINNED_SWIFT}, found ${swift_version}."; exit 1; }
+
+      - name: Validate the tag is semver
+        run: |
+          set -euo pipefail
+          # vMAJOR.MINOR.PATCH with optional -prerelease and +build metadata. The
+          # `v*.*.*` trigger is a glob and would also accept `v1.x.3` or `v1.2.3.4`.
+          semver='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?(\+[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$'
+          if [[ ! "$GITHUB_REF_NAME" =~ $semver ]]; then
+            echo "::error::Tag '$GITHUB_REF_NAME' is not vMAJOR.MINOR.PATCH (optional -prerelease, +build)."
+            exit 1
+          fi
+          echo "Releasing ${GITHUB_REF_NAME}"
+
+      # A release is only as good as the tests behind it: never publish on a red suite.
+      - name: Test (release)
+        run: swift test -c release
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release create "$GITHUB_REF_NAME" --generate-notes --verify-tag
