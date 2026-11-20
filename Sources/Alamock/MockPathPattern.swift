@@ -44,9 +44,7 @@ public struct MockPathPattern: Sendable, Equatable, CustomStringConvertible {
         let raw = pattern.hasPrefix("/") ? String(pattern.dropFirst()) : pattern
         self.rawValue = pattern
 
-        let parts = raw
-            .split(separator: "/", omittingEmptySubsequences: true)
-            .map(String.init)
+        let parts = raw.split(separator: "/", omittingEmptySubsequences: true).map(String.init)
 
         var parsed: [Segment] = []
         for (index, part) in parts.enumerated() {
@@ -79,9 +77,7 @@ public struct MockPathPattern: Sendable, Equatable, CustomStringConvertible {
             return [:]
         }
 
-        let parts = path
-            .split(separator: "/", omittingEmptySubsequences: true)
-            .map(String.init)
+        let parts = path.split(separator: "/", omittingEmptySubsequences: true).map(String.init)
 
         var parameters: [String: String] = [:]
         var pathIndex = 0

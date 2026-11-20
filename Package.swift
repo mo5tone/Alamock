@@ -15,10 +15,10 @@ let package = Package(
         .watchOS(.v6),
     ],
     products: [
-        .library(name: "Alamock", targets: ["Alamock"]),
+        .library(name: "Alamock", targets: ["Alamock"])
     ],
     dependencies: [
-        .package(url: "https://github.com/Alamofire/Alamofire.git", from: "5.10.2"),
+        .package(url: "https://github.com/Alamofire/Alamofire.git", from: "5.10.2")
     ],
     targets: [
         .target(

@@ -6,7 +6,7 @@
 import Foundation
 
 #if canImport(FoundationNetworking)
-import FoundationNetworking
+    import FoundationNetworking
 #endif
 
 /// The `URLProtocol` that routes requests to a ``MockServer``.
@@ -166,8 +166,7 @@ public final class MockURLProtocol: URLProtocol {
             return
         }
 
-        if server.followsRedirects,
-           let redirect = Self.redirectRequest(for: response, from: originalRequest) {
+        if server.followsRedirects, let redirect = Self.redirectRequest(for: response, from: originalRequest) {
             // Hand the redirect to URLSession. It follows the location, creates a new
             // request through this protocol (so the redirect target is recorded too), and
             // runs Alamofire's redirect handler and interceptors as usual.
@@ -234,11 +233,11 @@ public final class MockURLProtocol: URLProtocol {
         let redirectStatusCodes: Set<Int> = [301, 302, 303, 307, 308]
 
         guard redirectStatusCodes.contains(response.statusCode),
-              let location = response.headers.value(forHeader: "Location"),
-              !location.isEmpty,
-              let currentURL = request.url,
-              let targetURL = URL(string: location, relativeTo: currentURL)?.absoluteURL,
-              targetURL != currentURL
+            let location = response.headers.value(forHeader: "Location"),
+            !location.isEmpty,
+            let currentURL = request.url,
+            let targetURL = URL(string: location, relativeTo: currentURL)?.absoluteURL,
+            targetURL != currentURL
         else {
             return nil
         }
@@ -247,7 +246,8 @@ public final class MockURLProtocol: URLProtocol {
         redirect.url = targetURL
 
         let method = request.httpMethod?.uppercased() ?? "GET"
-        let switchesToGET = response.statusCode == 303
+        let switchesToGET =
+            response.statusCode == 303
             || ((response.statusCode == 301 || response.statusCode == 302)
                 && method != "GET"
                 && method != "HEAD")

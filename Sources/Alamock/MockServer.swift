@@ -409,11 +409,10 @@ public final class MockServer: @unchecked Sendable {
         let payload: [String: Any] = [
             "error": "No mock route matched \(request.method.rawValue) \(request.url.absoluteString)",
             "registeredRoutes": registeredRoutes,
-            "hint": "Register a matching route, e.g. mock.on(.get, \"/path\").respond(.json([...]))"
+            "hint": "Register a matching route, e.g. mock.on(.get, \"/path\").respond(.json([...]))",
         ]
 
-        return MockResponse
-            .json(payload, status: 500)
+        return MockResponse.json(payload, status: 500)
             .withHeader("X-Alamock-Error", "unmatched-request")
     }
 }

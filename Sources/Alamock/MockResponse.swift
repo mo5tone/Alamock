@@ -252,8 +252,8 @@ public struct MockResponse: Sendable {
         status: Int
     ) -> MockResponse {
         let message = """
-        MockResponse.json could not serialize the provided object: \(error)
-        """
+            MockResponse.json could not serialize the provided object: \(error)
+            """
         return MockResponse(
             statusCode: status == 200 ? 500 : status,
             headers: headers.withDefaultValue(

@@ -28,14 +28,14 @@ public enum MockError: Error, LocalizedError, Sendable, Equatable {
         switch self {
         case let .serverUnavailable(identifier):
             return """
-            No live MockServer is registered for identifier \(identifier). \
-            Keep the MockServer referenced for as long as its URLSession is used.
-            """
+                No live MockServer is registered for identifier \(identifier). \
+                Keep the MockServer referenced for as long as its URLSession is used.
+                """
         case let .responseSequenceExhausted(route):
             return """
-            The response sequence for route \(route) is exhausted and repeatingLast is false. \
-            Either register more responses or let the sequence repeat its last value.
-            """
+                The response sequence for route \(route) is exhausted and repeatingLast is false. \
+                Either register more responses or let the sequence repeat its last value.
+                """
         case let .invalidResponse(route, url):
             return "Could not build an HTTPURLResponse for \(route) at \(url)."
         case let .unreadableRequestBody(route):

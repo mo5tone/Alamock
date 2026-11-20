@@ -233,7 +233,7 @@ final class IntegrationTests: XCTestCase {
                 .serializingString().value
             XCTFail("Expected the second request to fail")
         } catch {
-            assertMockError(error, code: 2) // responseSequenceExhausted
+            assertMockError(error, code: 2)  // responseSequenceExhausted
         }
     }
 
@@ -247,7 +247,7 @@ final class IntegrationTests: XCTestCase {
                 .serializingString().value
             XCTFail("Expected the request to fail")
         } catch {
-            assertMockError(error, code: 3) // invalidResponse
+            assertMockError(error, code: 3)  // invalidResponse
         }
     }
 
@@ -347,7 +347,7 @@ final class IntegrationTests: XCTestCase {
             XCTFail("Expected a validation error")
         } catch let error as AFError {
             guard case let .responseValidationFailed(reason) = error,
-                  case let .unacceptableStatusCode(code) = reason
+                case let .unacceptableStatusCode(code) = reason
             else {
                 return XCTFail("Unexpected AFError: \(error)")
             }
@@ -412,12 +412,14 @@ final class IntegrationTests: XCTestCase {
 
     func testMultipartUploadBodyIsReadable() async throws {
         server.onPost("/upload-multipart")
-            .matchingBody(.predicate { body in
-                guard let body, let text = String(data: body, encoding: .utf8) else { return false }
-                return text.contains("name=\"file\"")
-                    && text.contains("filename=\"hello.txt\"")
-                    && text.contains("hello multipart")
-            })
+            .matchingBody(
+                .predicate { body in
+                    guard let body, let text = String(data: body, encoding: .utf8) else { return false }
+                    return text.contains("name=\"file\"")
+                        && text.contains("filename=\"hello.txt\"")
+                        && text.contains("hello multipart")
+                }
+            )
             .respond(.json(["uploaded": true]))
 
         let result = try await session.upload(
@@ -508,12 +510,18 @@ final class IntegrationTests: XCTestCase {
             of: (String, String).self
         ) { group in
             group.addTask {
-                ("A", try await sessionA.request("https://api.example.com/who")
-                    .serializingString().value)
+                (
+                    "A",
+                    try await sessionA.request("https://api.example.com/who")
+                        .serializingString().value
+                )
             }
             group.addTask {
-                ("B", try await sessionB.request("https://api.example.com/who")
-                    .serializingString().value)
+                (
+                    "B",
+                    try await sessionB.request("https://api.example.com/who")
+                        .serializingString().value
+                )
             }
 
             var result: [String: String] = [:]

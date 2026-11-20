@@ -69,10 +69,8 @@ public struct RequestMatcher: Sendable, CustomStringConvertible {
         if let path {
             let (pattern, parsedItems) = Self.splitQuery(from: path)
             self.path = MockPathPattern(pattern)
-            for item in parsedItems {
-                if expectedQueryItems[item.name] == nil {
-                    expectedQueryItems[item.name] = item.value
-                }
+            for item in parsedItems where expectedQueryItems[item.name] == nil {
+                expectedQueryItems[item.name] = item.value
             }
         } else {
             self.path = nil
@@ -138,7 +136,8 @@ public struct RequestMatcher: Sendable, CustomStringConvertible {
         if let predicate {
             // Give the predicate a request view that exposes the path parameters captured
             // by the pattern above, so predicates can assert on `:id`-style segments.
-            let predicateRequest = captured.isEmpty
+            let predicateRequest =
+                captured.isEmpty
                 ? request
                 : request.withMatch(route: description, pathParameters: captured)
             guard predicate(predicateRequest) else { return nil }
@@ -157,7 +156,8 @@ public struct RequestMatcher: Sendable, CustomStringConvertible {
             components.append("host \(host)")
         }
         if !queryItems.isEmpty {
-            let query = queryItems
+            let query =
+                queryItems
                 .sorted { $0.key < $1.key }
                 .map { name, value in value.map { "\(name)=\($0)" } ?? "\(name)" }
                 .joined(separator: "&")
