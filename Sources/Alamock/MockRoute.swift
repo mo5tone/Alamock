@@ -71,6 +71,7 @@ public final class MockRoute: @unchecked Sendable, CustomStringConvertible {
     /// Requires the given header to be present with the given value.
     ///
     /// Pass `nil` to require presence only. Header names are matched case-insensitively.
+    /// To require several headers at once, use ``match(headers:)``.
     @discardableResult
     public func match(header name: String, _ value: String?) -> Self {
         lock.sync {
@@ -80,6 +81,10 @@ public final class MockRoute: @unchecked Sendable, CustomStringConvertible {
     }
 
     /// Merges additional required headers into the route.
+    ///
+    /// A value of `nil` requires the header to be present with any value; header names are
+    /// matched case-insensitively. This is the plural form of ``match(header:_:)``: a later
+    /// call replaces the requirement for the same header.
     @discardableResult
     public func match(headers additionalHeaders: [String: String?]) -> Self {
         lock.sync {
