@@ -4,57 +4,55 @@
 //
 
 import Alamofire
-import XCTest
+import Foundation
+import Testing
 @testable import Alamock
 
 /// End-to-end tests that drive ``MockServer`` through real Alamofire `Session` instances.
-final class IntegrationTests: XCTestCase {
-    private var server: MockServer!
-    private var session: Session!
+@Suite("Integration")
+final class IntegrationTests {
+    private let server: MockServer
+    private let session: Session
 
-    override func setUp() {
-        super.setUp()
+    init() {
         server = MockServer(name: "IntegrationTests")
         session = server.makeSession()
     }
 
-    override func tearDown() {
+    deinit {
         session.session.invalidateAndCancel()
-        session = nil
         server.reset()
-        server = nil
-        super.tearDown()
     }
 
     // MARK: - Basic requests
 
-    func testAsyncGetDecodesJSON() async throws {
+    @Test func asyncGetDecodesJSON() async throws {
         server.onGet("/users/:id").respond(.json(["id": "42", "name": "Ada"]))
 
         let user = try await session.request("https://api.example.com/users/42")
             .serializingDecodable([String: String].self)
             .value
 
-        XCTAssertEqual(user, ["id": "42", "name": "Ada"])
-        XCTAssertEqual(server.recordedRequests.count, 1)
-        XCTAssertEqual(server.recordedRequests.first?.pathParameters["id"], "42")
+        #expect(user == ["id": "42", "name": "Ada"])
+        #expect(server.recordedRequests.count == 1)
+        #expect(server.recordedRequests.first?.pathParameters["id"] == "42")
     }
 
-    func testCompletionHandlerAPI() {
+    @Test func completionHandlerAPI() async {
         server.onGet("/hello").respond(.text("world"))
 
-        let expectation = expectation(description: "request completed")
-        session.request("https://api.example.com/hello").responseString { response in
-            XCTAssertEqual(response.value, "world")
-            XCTAssertEqual(response.response?.statusCode, 200)
-            XCTAssertNil(response.error)
-            expectation.fulfill()
+        let response = await withCheckedContinuation { continuation in
+            session.request("https://api.example.com/hello").responseString { response in
+                continuation.resume(returning: response)
+            }
         }
 
-        wait(for: [expectation], timeout: 5)
+        #expect(response.value == "world")
+        #expect(response.response?.statusCode == 200)
+        #expect(response.error == nil)
     }
 
-    func testStatusAndHeadersAreDelivered() async {
+    @Test func statusAndHeadersAreDelivered() async {
         server.onGet("/created").respond(
             .text("made", status: 201, headers: ["Location": "/created/1", "X-Trace": "abc"])
         )
@@ -63,29 +61,29 @@ final class IntegrationTests: XCTestCase {
             .serializingString()
             .response
 
-        XCTAssertEqual(response.response?.statusCode, 201)
-        XCTAssertEqual(response.response?.value(forHTTPHeaderField: "Location"), "/created/1")
-        XCTAssertEqual(response.response?.value(forHTTPHeaderField: "X-Trace"), "abc")
-        XCTAssertEqual(response.value, "made")
+        #expect(response.response?.statusCode == 201)
+        #expect(response.response?.value(forHTTPHeaderField: "Location") == "/created/1")
+        #expect(response.response?.value(forHTTPHeaderField: "X-Trace") == "abc")
+        #expect(response.value == "made")
     }
 
-    func testDefaultResponseIsEmpty200() {
+    @Test func defaultResponseIsEmpty200() async {
         server.onGet("/empty")
 
-        let expectation = expectation(description: "empty response")
-        session.request("https://api.example.com/empty").response { response in
-            XCTAssertEqual(response.response?.statusCode, 200)
-            XCTAssertTrue(response.data?.isEmpty ?? true)
-            XCTAssertNil(response.error)
-            expectation.fulfill()
+        let response = await withCheckedContinuation { continuation in
+            session.request("https://api.example.com/empty").response { response in
+                continuation.resume(returning: response)
+            }
         }
 
-        wait(for: [expectation], timeout: 5)
+        #expect(response.response?.statusCode == 200)
+        #expect(response.data?.isEmpty ?? true)
+        #expect(response.error == nil)
     }
 
     // MARK: - Encoders and matchers
 
-    func testJSONRequestEncodingIsVisibleToRouteMatcher() async throws {
+    @Test func jsonRequestEncodingIsVisibleToRouteMatcher() async throws {
         server.onPost("/users")
             .matchingJSONBody(["name": "Ada"], subset: true)
             .respond(.json(["id": 7]))
@@ -99,16 +97,16 @@ final class IntegrationTests: XCTestCase {
         .serializingDecodable([String: Int].self)
         .value
 
-        XCTAssertEqual(created, ["id": 7])
-        let recorded = try XCTUnwrap(server.recordedRequests.first)
-        XCTAssertEqual(recorded.method, .post)
-        XCTAssertEqual(recorded.header("Content-Type"), "application/json")
+        #expect(created == ["id": 7])
+        let recorded = try #require(server.recordedRequests.first)
+        #expect(recorded.method == .post)
+        #expect(recorded.header("Content-Type") == "application/json")
         let body = try recorded.decodeBody([String: JSONValueForTests].self)
-        XCTAssertEqual(body["name"]?.string, "Ada")
-        XCTAssertEqual(body["age"]?.int, 36)
+        #expect(body["name"]?.string == "Ada")
+        #expect(body["age"]?.int == 36)
     }
 
-    func testQueryEncodingIsVisibleToRouteMatcher() async throws {
+    @Test func queryEncodingIsVisibleToRouteMatcher() async throws {
         server.onGet("/search?q=swift").respond(.text("results"))
 
         let value = try await session.request(
@@ -119,12 +117,12 @@ final class IntegrationTests: XCTestCase {
         .serializingString()
         .value
 
-        XCTAssertEqual(value, "results")
-        XCTAssertEqual(server.recordedRequests.first?.query["q"], "swift")
-        XCTAssertTrue(server.verify(.get, "/search", times: 1).isSatisfied)
+        #expect(value == "results")
+        #expect(server.recordedRequests.first?.query["q"] == "swift")
+        #expect(server.verify(.get, "/search", times: 1).isSatisfied)
     }
 
-    func testFormRequestEncodingIsVisibleToRouteMatcher() async throws {
+    @Test func formRequestEncodingIsVisibleToRouteMatcher() async throws {
         server.onPost("/login")
             .matchingFormBody(["username": "ada", "password": "secret"])
             .respond(.status(204))
@@ -138,13 +136,13 @@ final class IntegrationTests: XCTestCase {
         .serializingString()
         .response
 
-        XCTAssertEqual(response.response?.statusCode, 204)
-        let body = try XCTUnwrap(server.recordedRequests.first?.bodyString)
-        XCTAssertTrue(body.contains("username=ada"), "Unexpected body: \(body)")
-        XCTAssertTrue(body.contains("password=secret"), "Unexpected body: \(body)")
+        #expect(response.response?.statusCode == 204)
+        let body = try #require(server.recordedRequests.first?.bodyString)
+        #expect(body.contains("username=ada"), "Unexpected body: \(body)")
+        #expect(body.contains("password=secret"), "Unexpected body: \(body)")
     }
 
-    func testHeaderMatching() async throws {
+    @Test func headerMatching() async throws {
         server.onGet("/private")
             .matchingHeader("Authorization", "Bearer token")
             .respond(.text("ok"))
@@ -156,10 +154,10 @@ final class IntegrationTests: XCTestCase {
         .serializingString()
         .value
 
-        XCTAssertEqual(value, "ok")
+        #expect(value == "ok")
     }
 
-    func testHostMatching() async throws {
+    @Test func hostMatching() async throws {
         server.onGet("/resource").matchingHost("api.example.com").respond(.text("api"))
         server.onGet("/resource").matchingHost("cdn.example.com").respond(.text("cdn"))
 
@@ -168,34 +166,34 @@ final class IntegrationTests: XCTestCase {
         let cdn = try await session.request("https://cdn.example.com/resource")
             .serializingString().value
 
-        XCTAssertEqual(api, "api")
-        XCTAssertEqual(cdn, "cdn")
+        #expect(api == "api")
+        #expect(cdn == "cdn")
     }
 
-    func testRoutesAreEvaluatedLastRegisteredFirst() async throws {
+    @Test func routesAreEvaluatedLastRegisteredFirst() async throws {
         server.onGet("/value").respond(.text("first"))
         server.onGet("/value").respond(.text("second"))
 
         let value = try await session.request("https://api.example.com/value")
             .serializingString().value
 
-        XCTAssertEqual(value, "second")
+        #expect(value == "second")
     }
 
-    func testRemovedRouteIsNoLongerMatched() async throws {
+    @Test func removedRouteIsNoLongerMatched() async {
         let route = server.onGet("/value").respond(.text("first"))
         route.remove()
 
         let response = await session.request("https://api.example.com/value")
             .serializingString().response
 
-        XCTAssertEqual(response.response?.statusCode, 500)
-        XCTAssertEqual(server.unmatchedRequests.count, 1)
+        #expect(response.response?.statusCode == 500)
+        #expect(server.unmatchedRequests.count == 1)
     }
 
     // MARK: - Dynamic responders and sequences
 
-    func testProviderResponderUsesCapturedPathParameters() async throws {
+    @Test func providerResponderUsesCapturedPathParameters() async throws {
         server.onGet("/users/:id").respond { request in
             .json(["id": request.pathParameters["id"]!])
         }
@@ -203,10 +201,10 @@ final class IntegrationTests: XCTestCase {
         let value = try await session.request("https://api.example.com/users/9")
             .serializingDecodable([String: String].self).value
 
-        XCTAssertEqual(value, ["id": "9"])
+        #expect(value == ["id": "9"])
     }
 
-    func testResponseSequenceIsConsumedInOrder() async throws {
+    @Test func responseSequenceIsConsumedInOrder() async throws {
         server.onGet("/flaky").respond(sequence: [.text("one"), .text("two")])
 
         let first = try await session.request("https://api.example.com/flaky")
@@ -216,28 +214,28 @@ final class IntegrationTests: XCTestCase {
         let third = try await session.request("https://api.example.com/flaky")
             .serializingString().value
 
-        XCTAssertEqual(first, "one")
-        XCTAssertEqual(second, "two")
-        XCTAssertEqual(third, "two", "The last response repeats by default")
+        #expect(first == "one")
+        #expect(second == "two")
+        #expect(third == "two", "The last response repeats by default")
     }
 
-    func testResponseSequenceCanBeExhausted() async {
+    @Test func responseSequenceCanBeExhausted() async {
         server.onGet("/once").respond(sequence: [.text("only")], repeatingLast: false)
 
         let first = try? await session.request("https://api.example.com/once")
             .serializingString().value
-        XCTAssertEqual(first, "only")
+        #expect(first == "only")
 
         do {
             _ = try await session.request("https://api.example.com/once")
                 .serializingString().value
-            XCTFail("Expected the second request to fail")
+            Issue.record("Expected the second request to fail")
         } catch {
-            assertMockError(error, code: 2)  // responseSequenceExhausted
+            #expect(mockErrorCode(error) == 2, "Unexpected error: \(error)")  // responseSequenceExhausted
         }
     }
 
-    func testAsyncProviderErrorFailsRequest() async {
+    @Test func asyncProviderErrorFailsRequest() async {
         server.onGet("/throwing").respond { _ in
             throw MockError.invalidResponse(route: "throwing", url: "https://api.example.com/throwing")
         }
@@ -245,66 +243,58 @@ final class IntegrationTests: XCTestCase {
         do {
             _ = try await session.request("https://api.example.com/throwing")
                 .serializingString().value
-            XCTFail("Expected the request to fail")
+            Issue.record("Expected the request to fail")
         } catch {
-            assertMockError(error, code: 3)  // invalidResponse
+            #expect(mockErrorCode(error) == 3, "Unexpected error: \(error)")  // invalidResponse
         }
     }
 
-    /// Asserts that `error` is Alamofire's `sessionTaskFailed` wrapper around a `MockError`
-    /// with the given stable ``MockError/errorCode``.
+    /// Returns the stable ``MockError/errorCode`` carried by Alamofire's `sessionTaskFailed`
+    /// wrapper, or `nil` when `error` is something else.
     ///
     /// `MockError` crosses URLSession's Objective-C boundary as an `NSError`, so identity is
     /// checked through `MockError.errorDomain` rather than a Swift cast.
-    private func assertMockError(
-        _ error: Error,
-        code: Int,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) {
+    private func mockErrorCode(_ error: Error) -> Int? {
         guard case let .sessionTaskFailed(underlying)? = error.asAFError else {
-            return XCTFail("Unexpected error: \(error)", file: file, line: line)
+            return nil
         }
         let nsError = underlying as NSError
-        XCTAssertEqual(nsError.domain, MockError.errorDomain, file: file, line: line)
-        XCTAssertEqual(nsError.code, code, file: file, line: line)
+        guard nsError.domain == MockError.errorDomain else { return nil }
+        return nsError.code
     }
 
     // MARK: - Delay, cancellation, timeout
 
-    func testDelayedResponseIsDeliveredAfterDelay() {
+    @Test func delayedResponseIsDeliveredAfterDelay() async {
         server.onGet("/slow").respond(.text("late").delayed(by: 0.15))
 
-        let expectation = expectation(description: "delayed response")
         let start = Date()
-        session.request("https://api.example.com/slow").responseString { response in
-            XCTAssertEqual(response.value, "late")
-            expectation.fulfill()
-        }
+        let value = try? await session.request("https://api.example.com/slow")
+            .serializingString().value
 
-        wait(for: [expectation], timeout: 5)
-        XCTAssertGreaterThanOrEqual(Date().timeIntervalSince(start), 0.1)
+        #expect(value == "late")
+        #expect(Date().timeIntervalSince(start) >= 0.1)
     }
 
-    func testCancellationStopsDelayedResponse() {
+    @Test func cancellationStopsDelayedResponse() async {
         server.onGet("/cancel").respond(.text("never").delayed(by: 5))
 
-        let expectation = expectation(description: "cancelled")
         let request = session.request("https://api.example.com/cancel")
-        request.responseString { response in
-            XCTAssertNil(response.value)
-            XCTAssertNotNil(response.error)
-            expectation.fulfill()
-        }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.2) {
             request.cancel()
         }
 
-        wait(for: [expectation], timeout: 5)
+        let response = await withCheckedContinuation { continuation in
+            request.responseString { response in
+                continuation.resume(returning: response)
+            }
+        }
+
+        #expect(response.value == nil)
+        #expect(response.error != nil)
     }
 
-    func testRequestTimeoutIsEnforcedByURLSession() async {
+    @Test func requestTimeoutIsEnforcedByURLSession() async {
         let configuration = server.makeURLSessionConfiguration()
         configuration.timeoutIntervalForRequest = 0.25
         let timeoutSession = Session(configuration: configuration)
@@ -315,49 +305,50 @@ final class IntegrationTests: XCTestCase {
         do {
             _ = try await timeoutSession.request("https://api.example.com/timeout")
                 .serializingString().value
-            XCTFail("Expected a timeout")
+            Issue.record("Expected a timeout")
         } catch {
             let urlError = (error as? AFError)?.underlyingError as? URLError
-            XCTAssertEqual(urlError?.code, .timedOut, "Unexpected error: \(error)")
+            #expect(urlError?.code == .timedOut, "Unexpected error: \(error)")
         }
     }
 
     // MARK: - Errors
 
-    func testURLErrorResponseFailsRequest() async {
+    @Test func urlErrorResponseFailsRequest() async {
         server.onGet("/offline").respond(.error(.notConnectedToInternet))
 
         do {
             _ = try await session.request("https://api.example.com/offline")
                 .serializingString().value
-            XCTFail("Expected a transport error")
+            Issue.record("Expected a transport error")
         } catch {
             let urlError = (error as? AFError)?.underlyingError as? URLError
-            XCTAssertEqual(urlError?.code, .notConnectedToInternet, "Unexpected error: \(error)")
+            #expect(urlError?.code == .notConnectedToInternet, "Unexpected error: \(error)")
         }
     }
 
-    func testValidationSurfacesHTTPError() async {
+    @Test func validationSurfacesHTTPError() async {
         server.onGet("/missing").respond(.json(["error": "not found"], status: 404))
 
         do {
             _ = try await session.request("https://api.example.com/missing")
                 .validate()
                 .serializingString().value
-            XCTFail("Expected a validation error")
+            Issue.record("Expected a validation error")
         } catch let error as AFError {
             guard case let .responseValidationFailed(reason) = error,
                 case let .unacceptableStatusCode(code) = reason
             else {
-                return XCTFail("Unexpected AFError: \(error)")
+                Issue.record("Unexpected AFError: \(error)")
+                return
             }
-            XCTAssertEqual(code, 404)
+            #expect(code == 404)
         } catch {
-            XCTFail("Unexpected error: \(error)")
+            Issue.record("Unexpected error: \(error)")
         }
     }
 
-    func testRetryPolicyRetriesMockedFailure() async throws {
+    @Test func retryPolicyRetriesMockedFailure() async throws {
         let retrySession = server.makeSession(
             interceptor: RetryPolicy(
                 retryLimit: 2,
@@ -372,13 +363,13 @@ final class IntegrationTests: XCTestCase {
         let value = try await retrySession.request("https://api.example.com/flaky")
             .serializingString().value
 
-        XCTAssertEqual(value, "recovered")
-        XCTAssertEqual(server.recordedRequests.count, 2)
+        #expect(value == "recovered")
+        #expect(server.recordedRequests.count == 2)
     }
 
     // MARK: - Uploads and downloads
 
-    func testUploadDataBodyIsReadable() async throws {
+    @Test func uploadDataBodyIsReadable() async throws {
         server.onPost("/upload")
             .matchingTextBody("hello-data")
             .respond(.text("stored"))
@@ -389,11 +380,11 @@ final class IntegrationTests: XCTestCase {
         )
         .serializingString().value
 
-        XCTAssertEqual(value, "stored")
-        XCTAssertEqual(server.recordedRequests.first?.bodyString, "hello-data")
+        #expect(value == "stored")
+        #expect(server.recordedRequests.first?.bodyString == "hello-data")
     }
 
-    func testUploadFileBodyIsReadable() async throws {
+    @Test func uploadFileBodyIsReadable() async throws {
         let fileURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("alamock-upload-\(UUID().uuidString).txt")
         try Data("file-body".utf8).write(to: fileURL)
@@ -406,11 +397,11 @@ final class IntegrationTests: XCTestCase {
         let value = try await session.upload(fileURL, to: "https://api.example.com/upload-file")
             .serializingString().value
 
-        XCTAssertEqual(value, "stored")
-        XCTAssertEqual(server.recordedRequests.first?.bodyString, "file-body")
+        #expect(value == "stored")
+        #expect(server.recordedRequests.first?.bodyString == "file-body")
     }
 
-    func testMultipartUploadBodyIsReadable() async throws {
+    @Test func multipartUploadBodyIsReadable() async throws {
         server.onPost("/upload-multipart")
             .matchingBody(
                 .predicate { body in
@@ -436,11 +427,11 @@ final class IntegrationTests: XCTestCase {
         .serializingDecodable([String: Bool].self)
         .value
 
-        XCTAssertEqual(result, ["uploaded": true])
-        XCTAssertEqual(server.recordedRequests.count, 1)
+        #expect(result == ["uploaded": true])
+        #expect(server.recordedRequests.count == 1)
     }
 
-    func testDownloadBodyIsWrittenToDestination() async throws {
+    @Test func downloadBodyIsWrittenToDestination() async throws {
         server.onGet("/file").respond(.data(Data("downloaded".utf8)))
 
         let destinationURL = FileManager.default.temporaryDirectory
@@ -458,25 +449,26 @@ final class IntegrationTests: XCTestCase {
         .serializingDownloadedFileURL()
         .value
 
-        XCTAssertEqual(fileURL.path, destinationURL.path)
-        XCTAssertEqual(try String(contentsOf: destinationURL, encoding: .utf8), "downloaded")
+        #expect(fileURL.path == destinationURL.path)
+        #expect(try String(contentsOf: destinationURL, encoding: .utf8) == "downloaded")
     }
 
     // MARK: - Redirects
 
-    func testRedirectIsFollowedAndBothHopsAreRecorded() async throws {
+    @Test func redirectIsFollowedAndBothHopsAreRecorded() async throws {
         server.onGet("/old").respond(.redirect(to: "/new"))
         server.onGet("/new").respond(.text("moved"))
 
         let value = try await session.request("https://api.example.com/old")
             .serializingString().value
 
-        XCTAssertEqual(value, "moved")
-        XCTAssertEqual(server.recordedRequests.map(\.path), ["/old", "/new"])
-        XCTAssertTrue(server.recordedRequests.allSatisfy(\.wasMatched))
+        #expect(value == "moved")
+        #expect(server.recordedRequests.map(\.path) == ["/old", "/new"])
+        let allMatched = server.recordedRequests.allSatisfy(\.wasMatched)
+        #expect(allMatched)
     }
 
-    func testRedirectIsNotFollowedWhenDisabled() async {
+    @Test func redirectIsNotFollowedWhenDisabled() async {
         server.followsRedirects = false
         server.onGet("/old").respond(.redirect(to: "/new"))
         server.onGet("/new").respond(.text("moved"))
@@ -484,14 +476,14 @@ final class IntegrationTests: XCTestCase {
         let response = await session.request("https://api.example.com/old")
             .serializingString().response
 
-        XCTAssertEqual(response.response?.statusCode, 302)
-        XCTAssertEqual(response.response?.value(forHTTPHeaderField: "Location"), "/new")
-        XCTAssertEqual(server.recordedRequests.map(\.path), ["/old"])
+        #expect(response.response?.statusCode == 302)
+        #expect(response.response?.value(forHTTPHeaderField: "Location") == "/new")
+        #expect(server.recordedRequests.map(\.path) == ["/old"])
     }
 
     // MARK: - Isolation and concurrency
 
-    func testTwoServersAreIsolated() async throws {
+    @Test func twoServersAreIsolated() async throws {
         let serverA = MockServer(name: "A")
         let serverB = MockServer(name: "B")
         let sessionA = serverA.makeSession()
@@ -531,22 +523,22 @@ final class IntegrationTests: XCTestCase {
             return result
         }
 
-        XCTAssertEqual(values, ["A": "A", "B": "B"])
-        XCTAssertEqual(serverA.recordedRequests.count, 1)
-        XCTAssertEqual(serverB.recordedRequests.count, 1)
-        XCTAssertTrue(serverA.verify(.get, "/who").isSatisfied)
-        XCTAssertTrue(serverB.verify(.get, "/who").isSatisfied)
+        #expect(values == ["A": "A", "B": "B"])
+        #expect(serverA.recordedRequests.count == 1)
+        #expect(serverB.recordedRequests.count == 1)
+        #expect(serverA.verify(.get, "/who").isSatisfied)
+        #expect(serverB.verify(.get, "/who").isSatisfied)
     }
 
-    func testConcurrentRequestsAreAllRecorded() async throws {
+    @Test func concurrentRequestsAreAllRecorded() async throws {
         server.onGet("/items/:id").respond { request in
             .json(["id": request.pathParameters["id"]!])
         }
 
-        // Capture the session locally: `addTask` takes a `sending` closure, and `self`
-        // (an XCTestCase) is not `Sendable`. `Session` is `@unchecked Sendable`, so the
-        // local copy can cross into the task group safely.
-        let session = try XCTUnwrap(self.session)
+        // Capture the session locally: `addTask` takes a `sending` closure, and the test
+        // instance is not `Sendable`. `Session` is `@unchecked Sendable`, so the local copy
+        // can cross into the task group safely.
+        let session = self.session
 
         let ids = try await withThrowingTaskGroup(of: String.self) { group in
             for index in 0..<20 {
@@ -564,12 +556,12 @@ final class IntegrationTests: XCTestCase {
             return seen
         }
 
-        XCTAssertEqual(Set(ids).count, 20)
-        XCTAssertEqual(server.recordedRequests.count, 20)
-        XCTAssertTrue(server.verify(.get, "/items/:id", times: 20).isSatisfied)
+        #expect(Set(ids).count == 20)
+        #expect(server.recordedRequests.count == 20)
+        #expect(server.verify(.get, "/items/:id", times: 20).isSatisfied)
     }
 
-    func testRequestFailsClosedWhenServerIsDeallocated() {
+    @Test func requestFailsClosedWhenServerIsDeallocated() async {
         var configuration: URLSessionConfiguration!
         do {
             let temporaryServer = MockServer(name: "deallocated")
@@ -580,122 +572,118 @@ final class IntegrationTests: XCTestCase {
         let urlSession = URLSession(configuration: configuration)
         defer { urlSession.invalidateAndCancel() }
 
-        let expectation = expectation(description: "request fails closed")
-        urlSession.dataTask(with: URL(string: "https://api.example.com/x")!) { data, response, error in
-            XCTAssertNil(data)
-            XCTAssertNil(response)
-            XCTAssertNotNil(error)
-            expectation.fulfill()
-        }.resume()
-
-        wait(for: [expectation], timeout: 5)
+        let outcome = await dataTaskResult(
+            urlSession,
+            URL(string: "https://api.example.com/x")!
+        )
+        #expect(outcome.data == nil)
+        #expect(outcome.response == nil)
+        #expect(outcome.error != nil)
     }
 
-    func testRequestWithoutServerIdentifierFailsClosed() {
+    @Test func requestWithoutServerIdentifierFailsClosed() async {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockURLProtocol.self]
 
         let urlSession = URLSession(configuration: configuration)
         defer { urlSession.invalidateAndCancel() }
 
-        let expectation = expectation(description: "request fails closed")
-        urlSession.dataTask(with: URL(string: "https://api.example.com/x")!) { data, response, error in
-            XCTAssertNil(data)
-            XCTAssertNil(response)
-            XCTAssertNotNil(error)
-            expectation.fulfill()
-        }.resume()
-
-        wait(for: [expectation], timeout: 5)
+        let outcome = await dataTaskResult(
+            urlSession,
+            URL(string: "https://api.example.com/x")!
+        )
+        #expect(outcome.data == nil)
+        #expect(outcome.response == nil)
+        #expect(outcome.error != nil)
     }
 
     // MARK: - Raw URLSession
 
-    func testRawURLSessionConfigurationInterceptsRequests() {
+    @Test func rawURLSessionConfigurationInterceptsRequests() async {
         server.onGet("/raw").respond(.text("raw ok"))
 
         let urlSession = URLSession(configuration: server.makeURLSessionConfiguration())
         defer { urlSession.invalidateAndCancel() }
 
-        let expectation = expectation(description: "raw request")
-        urlSession.dataTask(with: URL(string: "https://api.example.com/raw")!) { data, response, error in
-            XCTAssertNil(error)
-            XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
-            XCTAssertEqual(data.map { String(decoding: $0, as: UTF8.self) }, "raw ok")
-            expectation.fulfill()
-        }.resume()
-
-        wait(for: [expectation], timeout: 5)
+        let outcome = await dataTaskResult(
+            urlSession,
+            URL(string: "https://api.example.com/raw")!
+        )
+        #expect(outcome.error == nil)
+        #expect((outcome.response as? HTTPURLResponse)?.statusCode == 200)
+        #expect(
+            outcome.data.map { String(decoding: $0, as: UTF8.self) } == "raw ok"
+        )
     }
 
     // MARK: - Unmatched requests
 
-    func testUnmatchedRequestIsRejectedHermetically() async {
+    @Test func unmatchedRequestIsRejectedHermetically() async {
         server.onGet("/known").respond(.text("ok"))
 
         let response = await session.request("https://api.example.com/unknown")
             .serializingString()
             .response
 
-        XCTAssertEqual(response.response?.statusCode, 500)
-        XCTAssertEqual(
-            response.response?.value(forHTTPHeaderField: "X-Alamock-Error"),
-            "unmatched-request"
+        #expect(response.response?.statusCode == 500)
+        #expect(
+            response.response?.value(forHTTPHeaderField: "X-Alamock-Error")
+                == "unmatched-request"
         )
-        let body = try? XCTUnwrap(response.value)
-        XCTAssertTrue(body?.contains("No mock route matched") ?? false)
-        XCTAssertEqual(server.unmatchedRequests.count, 1)
-        XCTAssertTrue(server.hasUnmatchedRequests)
-        XCTAssertEqual(server.recordedRequests.count, 1)
+        let body = response.value
+        #expect(body?.contains("No mock route matched") ?? false)
+        #expect(server.unmatchedRequests.count == 1)
+        #expect(server.hasUnmatchedRequests)
+        #expect(server.recordedRequests.count == 1)
     }
 
-    func testUnmatchedRequestCanRespondWithFallback() async {
+    @Test func unmatchedRequestCanRespondWithFallback() async {
         server.unmatchedRequestBehavior = .respond(.text("fallback", status: 418))
 
         let response = await session.request("https://api.example.com/anything")
             .serializingString().response
 
-        XCTAssertEqual(response.response?.statusCode, 418)
-        XCTAssertEqual(response.value, "fallback")
-        XCTAssertTrue(server.hasUnmatchedRequests)
+        #expect(response.response?.statusCode == 418)
+        #expect(response.value == "fallback")
+        #expect(server.hasUnmatchedRequests)
     }
 
-    func testUnmatchedRequestCanFailWithError() async {
+    @Test func unmatchedRequestCanFailWithError() async {
         server.unmatchedRequestBehavior = .failWith(URLError(.notConnectedToInternet))
 
         do {
             _ = try await session.request("https://api.example.com/anything")
                 .serializingString().value
-            XCTFail("Expected a transport error")
+            Issue.record("Expected a transport error")
         } catch {
             let urlError = (error as? AFError)?.underlyingError as? URLError
-            XCTAssertEqual(urlError?.code, .notConnectedToInternet, "Unexpected error: \(error)")
+            #expect(urlError?.code == .notConnectedToInternet, "Unexpected error: \(error)")
         }
     }
 
     // MARK: - Verification
 
-    func testVerificationReportsMatches() async throws {
+    @Test func verificationReportsMatches() async throws {
         server.onGet("/ping").respond(.text("pong"))
 
         _ = try await session.request("https://api.example.com/ping").serializingString().value
         _ = try await session.request("https://api.example.com/ping").serializingString().value
 
         let satisfied = server.verify(.get, "/ping", times: 2)
-        XCTAssertTrue(satisfied.isSatisfied)
-        XCTAssertEqual(satisfied.actualCount, 2)
-        XCTAssertEqual(satisfied.matchingRequests.count, 2)
-        XCTAssertTrue(satisfied.wasCalled)
+        #expect(satisfied.isSatisfied)
+        #expect(satisfied.actualCount == 2)
+        #expect(satisfied.matchingRequests.count == 2)
+        #expect(satisfied.wasCalled)
 
         let unsatisfied = server.verify(.get, "/ping", times: 1)
-        XCTAssertFalse(unsatisfied.isSatisfied)
-        XCTAssertEqual(unsatisfied.actualCount, 2)
-        XCTAssertTrue(unsatisfied.failureMessage.contains("recorded 2"))
+        #expect(!unsatisfied.isSatisfied)
+        #expect(unsatisfied.actualCount == 2)
+        #expect(unsatisfied.failureMessage.contains("recorded 2"))
 
-        XCTAssertFalse(server.verify(.post, "/ping").isSatisfied)
+        #expect(!server.verify(.post, "/ping").isSatisfied)
     }
 
-    func testRecordedRequestsCanBeFilteredByMatcher() async throws {
+    @Test func recordedRequestsCanBeFilteredByMatcher() async throws {
         server.onGet("/users/:id").respond(.text("ok"))
         server.onPost("/users").respond(.text("created"))
 
@@ -707,27 +695,27 @@ final class IntegrationTests: XCTestCase {
         ).serializingString().value
 
         let gets = server.recordedRequests(matching: RequestMatcher(method: .get))
-        XCTAssertEqual(gets.count, 2)
-        XCTAssertEqual(gets.compactMap { $0.pathParameters["id"] }, ["1", "2"])
+        #expect(gets.count == 2)
+        #expect(gets.compactMap { $0.pathParameters["id"] } == ["1", "2"])
     }
 
     // MARK: - Configuration
 
-    func testConfigurationPreservesBaseSettingsAndStripsRoutingHeader() async throws {
+    @Test func configurationPreservesBaseSettingsAndStripsRoutingHeader() async throws {
         let base = URLSessionConfiguration.ephemeral
         base.timeoutIntervalForRequest = 7
         base.httpAdditionalHeaders = ["X-Custom": "custom-value"]
 
         let configuration = server.makeURLSessionConfiguration(base: base)
 
-        XCTAssertEqual(configuration.timeoutIntervalForRequest, 7)
-        XCTAssertEqual(configuration.httpAdditionalHeaders?["X-Custom"] as? String, "custom-value")
-        XCTAssertEqual(
-            configuration.httpAdditionalHeaders?[MockURLProtocol.serverIdentifierHeader] as? String,
-            server.id.uuidString
+        #expect(configuration.timeoutIntervalForRequest == 7)
+        #expect(configuration.httpAdditionalHeaders?["X-Custom"] as? String == "custom-value")
+        #expect(
+            configuration.httpAdditionalHeaders?[MockURLProtocol.serverIdentifierHeader] as? String
+                == server.id.uuidString
         )
-        XCTAssertNil(configuration.urlCache)
-        XCTAssertEqual(configuration.requestCachePolicy, .reloadIgnoringLocalCacheData)
+        #expect(configuration.urlCache == nil)
+        #expect(configuration.requestCachePolicy == .reloadIgnoringLocalCacheData)
 
         server.onGet("/custom").respond(.text("ok"))
         let customSession = Session(configuration: configuration)
@@ -736,12 +724,12 @@ final class IntegrationTests: XCTestCase {
         _ = try await customSession.request("https://api.example.com/custom")
             .serializingString().value
 
-        let recorded = try XCTUnwrap(server.recordedRequests.first)
-        XCTAssertNil(recorded.header(MockURLProtocol.serverIdentifierHeader))
-        XCTAssertEqual(recorded.header("X-Custom"), "custom-value")
+        let recorded = try #require(server.recordedRequests.first)
+        #expect(recorded.header(MockURLProtocol.serverIdentifierHeader) == nil)
+        #expect(recorded.header("X-Custom") == "custom-value")
     }
 
-    func testMakeSessionWithCustomConfiguration() async throws {
+    @Test func makeSessionWithCustomConfiguration() async throws {
         let base = URLSessionConfiguration.ephemeral
         base.timeoutIntervalForRequest = 12
         base.httpAdditionalHeaders = ["X-Base": "kept"]
@@ -753,42 +741,65 @@ final class IntegrationTests: XCTestCase {
         let value = try await customSession.request("https://api.example.com/configured")
             .serializingString().value
 
-        XCTAssertEqual(value, "ok")
-        XCTAssertEqual(customSession.session.configuration.timeoutIntervalForRequest, 12)
-        XCTAssertEqual(
-            customSession.session.configuration.httpAdditionalHeaders?["X-Base"] as? String,
-            "kept"
+        #expect(value == "ok")
+        #expect(customSession.session.configuration.timeoutIntervalForRequest == 12)
+        #expect(
+            customSession.session.configuration.httpAdditionalHeaders?["X-Base"] as? String
+                == "kept"
         )
-        XCTAssertEqual(server.recordedRequests.first?.header("X-Base"), "kept")
+        #expect(server.recordedRequests.first?.header("X-Base") == "kept")
     }
 
     // MARK: - State management
 
-    func testResetClearsRoutesAndRecordings() async throws {
+    @Test func resetClearsRoutesAndRecordings() async throws {
         server.onGet("/x").respond(.text("x"))
         _ = try await session.request("https://api.example.com/x").serializingString().value
-        XCTAssertEqual(server.recordedRequests.count, 1)
+        #expect(server.recordedRequests.count == 1)
 
         server.reset()
 
-        XCTAssertTrue(server.registeredRoutes.isEmpty)
-        XCTAssertTrue(server.recordedRequests.isEmpty)
-        XCTAssertTrue(server.unmatchedRequests.isEmpty)
-        XCTAssertTrue(server.recordedRequests(matching: RequestMatcher()).isEmpty)
+        #expect(server.registeredRoutes.isEmpty)
+        #expect(server.recordedRequests.isEmpty)
+        #expect(server.unmatchedRequests.isEmpty)
+        #expect(server.recordedRequests(matching: RequestMatcher()).isEmpty)
     }
 
-    func testResetRecordingsKeepsRoutes() async throws {
+    @Test func resetRecordingsKeepsRoutes() async throws {
         server.onGet("/x").respond(.text("x"))
         _ = try await session.request("https://api.example.com/x").serializingString().value
 
         server.resetRecordings()
 
-        XCTAssertTrue(server.recordedRequests.isEmpty)
-        XCTAssertEqual(server.registeredRoutes.count, 1)
+        #expect(server.recordedRequests.isEmpty)
+        #expect(server.registeredRoutes.count == 1)
 
         let value = try await session.request("https://api.example.com/x")
             .serializingString().value
-        XCTAssertEqual(value, "x")
+        #expect(value == "x")
+    }
+
+    // MARK: - Helpers
+
+    /// The callback arguments of a raw `URLSession` data task.
+    private struct DataTaskOutcome {
+        let data: Data?
+        let response: URLResponse?
+        let error: Error?
+    }
+
+    /// Runs a raw `URLSession` data task and returns its callback arguments.
+    private func dataTaskResult(
+        _ urlSession: URLSession,
+        _ url: URL
+    ) async -> DataTaskOutcome {
+        await withCheckedContinuation { continuation in
+            urlSession.dataTask(with: url) { data, response, error in
+                continuation.resume(
+                    returning: DataTaskOutcome(data: data, response: response, error: error)
+                )
+            }.resume()
+        }
     }
 }
 

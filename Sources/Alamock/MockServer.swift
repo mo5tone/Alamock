@@ -30,22 +30,26 @@ public enum UnmatchedRequestBehavior: Sendable {
 /// interceptors all behave as they do in production.
 ///
 /// ```swift
-/// final class UserServiceTests: XCTestCase {
-///     var mock: MockServer!
-///     var session: Session!
+/// @Suite("UserService")
+/// final class UserServiceTests {
+///     private let mock = MockServer()
+///     private let session: Session
 ///
-///     override func setUp() {
-///         super.setUp()
-///         mock = MockServer()
+///     init() {
 ///         session = mock.makeSession()
 ///         mock.on(.get, "/users/:id").respond(.json(["id": 42, "name": "Ada"]))
 ///     }
 ///
-///     func testFetchesUser() async throws {
+///     deinit {
+///         session.session.invalidateAndCancel()
+///         mock.reset()
+///     }
+///
+///     @Test func fetchesUser() async throws {
 ///         let service = UserService(session: session)
 ///         let user = try await service.user(id: 42)
-///         XCTAssertEqual(user.name, "Ada")
-///         XCTAssertTrue(mock.verify(.get, "/users/:id").isSatisfied)
+///         #expect(user.name == "Ada")
+///         #expect(mock.verify(.get, "/users/:id").isSatisfied)
 ///     }
 /// }
 /// ```

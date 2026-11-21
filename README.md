@@ -57,30 +57,30 @@ targets: [
 ```swift
 import Alamofire
 import Alamock
-import XCTest
+import Foundation
+import Testing
 
 private struct User: Decodable {
     let id: Int
     let name: String
 }
 
-final class UserServiceTests: XCTestCase {
-    private var mock: MockServer!
-    private var session: Session!
+@Suite("UserService")
+final class UserServiceTests {
+    private let mock: MockServer
+    private let session: Session
 
-    override func setUp() {
-        super.setUp()
+    init() {
         mock = MockServer(name: "UserServiceTests")
         session = mock.makeSession()
     }
 
-    override func tearDown() {
+    deinit {
         session.session.invalidateAndCancel()
         mock.reset()
-        super.tearDown()
     }
 
-    func testLoadsUser() async throws {
+    @Test func loadsUser() async throws {
         mock.onGet("/users/42").respond(.json(["id": 42, "name": "Ada"]))
 
         let user = try await session
@@ -89,10 +89,10 @@ final class UserServiceTests: XCTestCase {
             .serializingDecodable(User.self)
             .value
 
-        XCTAssertEqual(user.name, "Ada")
+        #expect(user.name == "Ada")
 
         let verification = mock.verify(.get, "/users/42")
-        XCTAssertTrue(verification.isSatisfied, verification.failureMessage)
+        #expect(verification.isSatisfied, "\(verification.failureMessage)")
     }
 }
 ```
@@ -101,9 +101,13 @@ Completion-handler APIs work the same way — the mock is transport-level, not
 concurrency-level:
 
 ```swift
-session.request("https://api.example.com/users/42").responseDecodable(of: User.self) { response in
-    XCTAssertEqual(response.value?.name, "Ada")
+let response = await withCheckedContinuation { continuation in
+    session.request("https://api.example.com/users/42")
+        .responseDecodable(of: User.self) { response in
+            continuation.resume(returning: response)
+        }
 }
+#expect(response.value?.name == "Ada")
 ```
 
 ## How it plugs in
@@ -292,11 +296,11 @@ Verification is deliberately framework-agnostic; assert on `isSatisfied` or `act
 
 ```swift
 let verification = mock.verify(.post, "/login", times: 2)
-XCTAssertTrue(verification.isSatisfied, verification.failureMessage)
+#expect(verification.isSatisfied, "\(verification.failureMessage)")
 
 // Or with full matcher control:
 let matcher = RequestMatcher(method: .get, path: "/users/:id", headers: ["X-Env": "test"])
-XCTAssertEqual(mock.verify(matcher, times: 1).actualCount, 1)
+#expect(mock.verify(matcher, times: 1).actualCount == 1)
 ```
 
 `MockVerification` also provides `matchingRequests`, `wasCalled`, and `failureMessage`

@@ -7,9 +7,9 @@ import Foundation
 
 /// The result of a ``MockServer/verify(_:times:)-`` assertion.
 ///
-/// Verification is deliberately not tied to XCTest or any other test framework: assert on
-/// ``isSatisfied`` (using `XCTAssertTrue(verification.isSatisfied, verification.failureMessage)`)
-/// or on ``actualCount``.
+/// Verification is deliberately not tied to any test framework: assert on ``isSatisfied``
+/// (for example `#expect(verification.isSatisfied, "\(verification.failureMessage)")`) or on
+/// ``actualCount``.
 public struct MockVerification: Sendable, CustomStringConvertible {
     /// The matcher used for verification.
     public let matcher: RequestMatcher
@@ -44,11 +44,11 @@ public struct MockVerification: Sendable, CustomStringConvertible {
 
     /// A message describing the expectation and the requests that were actually recorded.
     ///
-    /// Pass this to `XCTAssertTrue` as its failure message:
+    /// Pass this as the message of a Swift Testing `#expect`:
     ///
     /// ```swift
     /// let verification = mock.verify(.post, "/login")
-    /// XCTAssertTrue(verification.isSatisfied, verification.failureMessage)
+    /// #expect(verification.isSatisfied, "\(verification.failureMessage)")
     /// ```
     public var failureMessage: String {
         var lines = [
