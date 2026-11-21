@@ -10,16 +10,16 @@ import Foundation
 ///
 /// ```swift
 /// // Exact JSON comparison, ignoring key order and whitespace:
-/// mock.on(.post, "/users").matchingJSONBody(["name": "Ada"])
+/// mock.on(.post, "/users").match(jsonBody: ["name": "Ada"])
 ///
 /// // Only the listed fields must match:
-/// mock.on(.post, "/users").matchingJSONBody(["name": "Ada"], subset: true)
+/// mock.on(.post, "/users").match(jsonBody: ["name": "Ada"], subset: true)
 ///
 /// // Form-encoded bodies:
-/// mock.on(.post, "/login").matchingFormBody(["user": "ada", "password": "secret"])
+/// mock.on(.post, "/login").match(formBody: ["user": "ada", "password": "secret"])
 ///
 /// // Anything goes:
-/// mock.on(.post, "/raw").matchingBody(.predicate { $0?.count == 16 })
+/// mock.on(.post, "/raw").match(body: .predicate { $0?.count == 16 })
 /// ```
 public struct MockBodyMatcher: Sendable, CustomStringConvertible {
     enum Kind {

@@ -15,8 +15,8 @@ import Foundation
 ///
 /// ```swift
 /// mock.on(.post, "/users/:id")
-///     .matchingHeader("Authorization", "Bearer token")
-///     .matchingJSONBody(["name": "Ada"])
+///     .match(header: "Authorization", "Bearer token")
+///     .match(jsonBody: ["name": "Ada"])
 ///     .respond(.json(["id": 1], status: 201))
 /// ```
 public final class MockRoute: @unchecked Sendable, CustomStringConvertible {
@@ -51,7 +51,7 @@ public final class MockRoute: @unchecked Sendable, CustomStringConvertible {
 
     /// Restricts the route to requests with the given host (case-insensitive).
     @discardableResult
-    public func matchingHost(_ host: String) -> Self {
+    public func match(host: String) -> Self {
         lock.sync { matcher.host = host }
         return self
     }
@@ -60,7 +60,7 @@ public final class MockRoute: @unchecked Sendable, CustomStringConvertible {
     ///
     /// A value of `nil` requires the query item to be present with any value.
     @discardableResult
-    public func matchingQuery(_ queryItems: [String: String?]) -> Self {
+    public func match(queryItems: [String: String?]) -> Self {
         lock.sync {
             matcher.queryItems.merge(queryItems) { _, new in new }
         }
@@ -71,7 +71,7 @@ public final class MockRoute: @unchecked Sendable, CustomStringConvertible {
     ///
     /// Pass `nil` to require presence only. Header names are matched case-insensitively.
     @discardableResult
-    public func matchingHeader(_ name: String, _ value: String?) -> Self {
+    public func match(header name: String, _ value: String?) -> Self {
         lock.sync {
             matcher.headers[name] = value
         }
@@ -80,16 +80,16 @@ public final class MockRoute: @unchecked Sendable, CustomStringConvertible {
 
     /// Merges additional required headers into the route.
     @discardableResult
-    public func matchingHeaders(_ headers: [String: String?]) -> Self {
+    public func match(headers additionalHeaders: [String: String?]) -> Self {
         lock.sync {
-            matcher.headers.merge(headers) { _, new in new }
+            matcher.headers.merge(additionalHeaders) { _, new in new }
         }
         return self
     }
 
     /// Requires a body that satisfies `matcher`.
     @discardableResult
-    public func matchingBody(_ matcher: MockBodyMatcher) -> Self {
+    public func match(body matcher: MockBodyMatcher) -> Self {
         lock.sync {
             self.matcher.body = matcher
         }
@@ -99,31 +99,31 @@ public final class MockRoute: @unchecked Sendable, CustomStringConvertible {
     /// Requires a JSON body equal to `object` (or containing `object`'s fields when
     /// `subset` is `true`).
     @discardableResult
-    public func matchingJSONBody(_ object: Any, subset: Bool = false) -> Self {
-        matchingBody(.json(object, subset: subset))
+    public func match(jsonBody object: Any, subset: Bool = false) -> Self {
+        match(body: .json(object, subset: subset))
     }
 
     /// Requires a UTF-8 body equal to `text`.
     @discardableResult
-    public func matchingTextBody(_ text: String) -> Self {
-        matchingBody(.text(text))
+    public func match(textBody text: String) -> Self {
+        match(body: .text(text))
     }
 
     /// Requires a form-urlencoded body containing the given fields.
     @discardableResult
-    public func matchingFormBody(_ fields: [String: String]) -> Self {
-        matchingBody(.form(fields))
+    public func match(formBody fields: [String: String]) -> Self {
+        match(body: .form(fields))
     }
 
     /// Adds an arbitrary predicate that is evaluated after all other constraints.
     ///
     /// ```swift
-    /// mock.on(.get, "/search").matching { request in
+    /// mock.on(.get, "/search").match { request in
     ///     request.query["q"]?.count ?? 0 > 3
     /// }
     /// ```
     @discardableResult
-    public func matching(_ predicate: @escaping @Sendable (RecordedRequest) -> Bool) -> Self {
+    public func match(_ predicate: @escaping @Sendable (RecordedRequest) -> Bool) -> Self {
         lock.sync {
             let existing = matcher.predicate
             if let existing {

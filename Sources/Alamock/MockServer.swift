@@ -166,54 +166,6 @@ public final class MockServer: @unchecked Sendable {
         return route
     }
 
-    /// Registers a route that matches any HTTP method.
-    @discardableResult
-    public func onAnyRequest(_ path: String = "**") -> MockRoute {
-        on(nil, path)
-    }
-
-    /// Registers a `GET` route.
-    @discardableResult
-    public func onGet(_ path: String = "**") -> MockRoute {
-        on(.get, path)
-    }
-
-    /// Registers a `POST` route.
-    @discardableResult
-    public func onPost(_ path: String = "**") -> MockRoute {
-        on(.post, path)
-    }
-
-    /// Registers a `PUT` route.
-    @discardableResult
-    public func onPut(_ path: String = "**") -> MockRoute {
-        on(.put, path)
-    }
-
-    /// Registers a `PATCH` route.
-    @discardableResult
-    public func onPatch(_ path: String = "**") -> MockRoute {
-        on(.patch, path)
-    }
-
-    /// Registers a `DELETE` route.
-    @discardableResult
-    public func onDelete(_ path: String = "**") -> MockRoute {
-        on(.delete, path)
-    }
-
-    /// Registers a `HEAD` route.
-    @discardableResult
-    public func onHead(_ path: String = "**") -> MockRoute {
-        on(.head, path)
-    }
-
-    /// Registers an `OPTIONS` route.
-    @discardableResult
-    public func onOptions(_ path: String = "**") -> MockRoute {
-        on(.options, path)
-    }
-
     /// The routes currently registered, in registration order.
     public var registeredRoutes: [MockRoute] {
         lock.sync { routes }
@@ -387,6 +339,6 @@ public final class MockServer: @unchecked Sendable {
         ]
 
         return MockResponse.json(payload, status: 500)
-            .withHeader("X-Alamock-Error", "unmatched-request")
+            .with(header: "X-Alamock-Error", "unmatched-request")
     }
 }

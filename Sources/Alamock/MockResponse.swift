@@ -15,7 +15,7 @@ import Foundation
 ///
 /// ```swift
 /// mock.on(.get, "/users/1").respond(.json(["id": 1, "name": "Ada"], status: 200))
-/// mock.on(.post, "/login").respond(.status(401).withHeader("WWW-Authenticate", "Bearer"))
+/// mock.on(.post, "/login").respond(.status(401).with(header: "WWW-Authenticate", "Bearer"))
 /// mock.on(.get, "/slow").respond(.json([:]).delayed(by: 0.5))
 /// mock.on(.get, "/offline").respond(.error(.notConnectedToInternet))
 /// ```
@@ -199,21 +199,21 @@ public struct MockResponse: Sendable {
     }
 
     /// Returns a copy of the response with a different status code.
-    public func withStatus(_ statusCode: Int) -> MockResponse {
+    public func with(status statusCode: Int) -> MockResponse {
         var copy = self
         copy.statusCode = statusCode
         return copy
     }
 
     /// Returns a copy of the response with an added (or replaced) header.
-    public func withHeader(_ name: String, _ value: String) -> MockResponse {
+    public func with(header name: String, _ value: String) -> MockResponse {
         var copy = self
         copy.headers[name] = value
         return copy
     }
 
     /// Returns a copy of the response with additional headers.
-    public func withHeaders(_ additionalHeaders: [String: String]) -> MockResponse {
+    public func with(headers additionalHeaders: [String: String]) -> MockResponse {
         var copy = self
         for (name, value) in additionalHeaders {
             copy.headers[name] = value
@@ -222,7 +222,7 @@ public struct MockResponse: Sendable {
     }
 
     /// Returns a copy of the response with a replaced body.
-    public func withBody(_ data: Data) -> MockResponse {
+    public func with(body data: Data) -> MockResponse {
         var copy = self
         copy.body = data
         return copy

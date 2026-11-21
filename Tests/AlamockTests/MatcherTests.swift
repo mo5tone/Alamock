@@ -161,10 +161,10 @@ struct MockResponseTests {
 
     @Test func modifiers() {
         let response = MockResponse.status(200)
-            .withStatus(503)
-            .withHeader("Retry-After", "1")
-            .withHeaders(["X-A": "1", "X-B": "2"])
-            .withBody(Data("body".utf8))
+            .with(status: 503)
+            .with(header: "Retry-After", "1")
+            .with(headers: ["X-A": "1", "X-B": "2"])
+            .with(body: Data("body".utf8))
             .delayed(by: 1.5)
 
         #expect(response.statusCode == 503)
