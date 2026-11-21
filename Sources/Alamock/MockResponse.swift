@@ -14,10 +14,10 @@ import Foundation
 /// delay, and an optional transport-level failure.
 ///
 /// ```swift
-/// mock.on(.get, "/users/1").respond(.json(["id": 1, "name": "Ada"], status: 200))
-/// mock.on(.post, "/login").respond(.status(401).withHeader("WWW-Authenticate", "Bearer"))
-/// mock.on(.get, "/slow").respond(.json([:]).delayed(by: 0.5))
-/// mock.on(.get, "/offline").respond(.error(.notConnectedToInternet))
+/// mock.on(.get("/users/1")).respond(.json(["id": 1, "name": "Ada"], status: 200))
+/// mock.on(.post("/login")).respond(.status(401).with(header: "WWW-Authenticate", "Bearer"))
+/// mock.on(.get("/slow")).respond(.json([:]).delayed(by: 0.5))
+/// mock.on(.get("/offline")).respond(.error(.notConnectedToInternet))
 /// ```
 public struct MockResponse: Sendable {
     /// The HTTP status code of the emulated response.
@@ -46,19 +46,19 @@ public struct MockResponse: Sendable {
     /// Creates a mock response.
     ///
     /// - Parameters:
-    ///   - statusCode: The HTTP status code. Defaults to `200`.
+    ///   - status: The HTTP status code. Defaults to `200`.
     ///   - headers: Response headers. Defaults to empty.
     ///   - body: Response body bytes. Defaults to empty.
     ///   - delay: Artificial delay in seconds. Defaults to `0`.
     ///   - error: A transport-level error to emulate. Defaults to `nil`.
     public init(
-        statusCode: Int = 200,
+        status: Int = 200,
         headers: [String: String] = [:],
         body: Data = Data(),
         delay: TimeInterval = 0,
         error: URLError? = nil
     ) {
-        self.statusCode = statusCode
+        self.statusCode = status
         self.headers = headers
         self.body = body
         self.delay = delay
@@ -73,7 +73,7 @@ public struct MockResponse: Sendable {
         status: Int = 200,
         headers: [String: String] = [:]
     ) -> MockResponse {
-        MockResponse(statusCode: status, headers: headers, body: data)
+        MockResponse(status: status, headers: headers, body: data)
     }
 
     /// A plain text response. Adds `Content-Type: text/plain; charset=utf-8` unless one is provided.
@@ -86,7 +86,7 @@ public struct MockResponse: Sendable {
             for: "Content-Type",
             value: "text/plain; charset=utf-8"
         )
-        return MockResponse(statusCode: status, headers: merged, body: Data(string.utf8))
+        return MockResponse(status: status, headers: merged, body: Data(string.utf8))
     }
 
     /// A JSON response built from a JSON-serializable object (`[String: Any]`, `[Any]`, scalars, …).
@@ -119,7 +119,7 @@ public struct MockResponse: Sendable {
                 withJSONObject: object,
                 options: [.fragmentsAllowed, .sortedKeys]
             )
-            return MockResponse(statusCode: status, headers: merged, body: data)
+            return MockResponse(status: status, headers: merged, body: data)
         } catch {
             return jsonSerializationFailure(error, headers: merged, status: status)
         }
@@ -138,7 +138,7 @@ public struct MockResponse: Sendable {
 
         do {
             return MockResponse(
-                statusCode: status,
+                status: status,
                 headers: merged,
                 body: try encoder.encode(value)
             )
@@ -152,12 +152,12 @@ public struct MockResponse: Sendable {
         status: Int = 200,
         headers: [String: String] = [:]
     ) -> MockResponse {
-        MockResponse(statusCode: status, headers: headers)
+        MockResponse(status: status, headers: headers)
     }
 
     /// A response containing only a status code.
     public static func status(_ statusCode: Int) -> MockResponse {
-        MockResponse(statusCode: statusCode)
+        MockResponse(status: statusCode)
     }
 
     /// A transport-level failure, e.g. ``URLError/timedOut`` or
@@ -171,8 +171,8 @@ public struct MockResponse: Sendable {
     /// A redirect response with a `Location` header.
     ///
     /// ```swift
-    /// mock.on(.get, "/old").respond(.redirect(to: "/new"))
-    /// mock.on(.get, "/new").respond(.text("moved"))
+    /// mock.on(.get("/old")).respond(.redirect(to: "/new"))
+    /// mock.on(.get("/new")).respond(.text("moved"))
     /// ```
     ///
     /// - Note: The mock transport reports the redirect to URLSession, which follows it
@@ -186,7 +186,7 @@ public struct MockResponse: Sendable {
         headers: [String: String] = [:]
     ) -> MockResponse {
         let merged = headers.withDefaultValue(for: "Location", value: location)
-        return MockResponse(statusCode: status, headers: merged)
+        return MockResponse(status: status, headers: merged)
     }
 
     // MARK: - Modifiers
@@ -199,21 +199,21 @@ public struct MockResponse: Sendable {
     }
 
     /// Returns a copy of the response with a different status code.
-    public func withStatus(_ statusCode: Int) -> MockResponse {
+    public func with(status statusCode: Int) -> MockResponse {
         var copy = self
         copy.statusCode = statusCode
         return copy
     }
 
     /// Returns a copy of the response with an added (or replaced) header.
-    public func withHeader(_ name: String, _ value: String) -> MockResponse {
+    public func with(header name: String, _ value: String) -> MockResponse {
         var copy = self
         copy.headers[name] = value
         return copy
     }
 
     /// Returns a copy of the response with additional headers.
-    public func withHeaders(_ additionalHeaders: [String: String]) -> MockResponse {
+    public func with(headers additionalHeaders: [String: String]) -> MockResponse {
         var copy = self
         for (name, value) in additionalHeaders {
             copy.headers[name] = value
@@ -222,7 +222,7 @@ public struct MockResponse: Sendable {
     }
 
     /// Returns a copy of the response with a replaced body.
-    public func withBody(_ data: Data) -> MockResponse {
+    public func with(body data: Data) -> MockResponse {
         var copy = self
         copy.body = data
         return copy
@@ -255,7 +255,7 @@ public struct MockResponse: Sendable {
             MockResponse.json could not serialize the provided object: \(error)
             """
         return MockResponse(
-            statusCode: status == 200 ? 500 : status,
+            status: status == 200 ? 500 : status,
             headers: headers.withDefaultValue(
                 for: "X-Alamock-Error",
                 value: "json-serialization-failed"

@@ -3,7 +3,6 @@
 //  Alamock
 //
 
-import Alamofire
 import Foundation
 
 /// What a ``MockServer`` does with a request that matches no registered route.
@@ -17,8 +16,8 @@ public enum UnmatchedRequestBehavior: Sendable {
     /// Respond with a fixed ``MockResponse``.
     case respond(MockResponse)
 
-    /// Fail the request with a transport-level error.
-    case failWith(URLError)
+    /// Fail the request with a transport-level error, e.g. ``URLError/notConnectedToInternet``.
+    case failWith(URLError.Code)
 }
 
 /// A stateful, pluggable mock HTTP server for Alamofire unit tests.
@@ -29,6 +28,9 @@ public enum UnmatchedRequestBehavior: Sendable {
 /// unmodified: parameter encoding, response serializers, validation, retriers, and
 /// interceptors all behave as they do in production.
 ///
+/// Alamofire-specific helpers live under ``af``; the routing and configuration API is
+/// independent of Alamofire.
+///
 /// ```swift
 /// @Suite("UserService")
 /// final class UserServiceTests {
@@ -36,8 +38,8 @@ public enum UnmatchedRequestBehavior: Sendable {
 ///     private let session: Session
 ///
 ///     init() {
-///         session = mock.makeSession()
-///         mock.on(.get, "/users/:id").respond(.json(["id": 42, "name": "Ada"]))
+///         session = mock.af.session()
+///         mock.on(.get("/users/:id")).respond(.json(["id": 42, "name": "Ada"]))
 ///     }
 ///
 ///     deinit {
@@ -49,7 +51,7 @@ public enum UnmatchedRequestBehavior: Sendable {
 ///         let service = UserService(session: session)
 ///         let user = try await service.user(id: 42)
 ///         #expect(user.name == "Ada")
-///         #expect(mock.verify(.get, "/users/:id").isSatisfied)
+///         #expect(mock.verify(.get("/users/:id")).isSatisfied)
 ///     }
 /// }
 /// ```
@@ -146,102 +148,23 @@ public final class MockServer: @unchecked Sendable {
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
     }
 
-    /// Creates an Alamofire `Session` wired to this server.
-    ///
-    /// - Parameter interceptor: An optional request interceptor, e.g. a `RetryPolicy`.
-    ///   All interceptors run normally because the mock only replaces the transport.
-    public func makeSession(interceptor: (any RequestInterceptor)? = nil) -> Session {
-        Session(configuration: makeURLSessionConfiguration(), interceptor: interceptor)
-    }
-
-    /// Creates an Alamofire `Session` from a customized configuration and this server.
-    ///
-    /// Use this to keep production settings such as timeouts, headers, and a custom
-    /// `URLSessionDelegate` while routing the session through the mock:
-    ///
-    /// ```swift
-    /// let base = URLSessionConfiguration.ephemeral
-    /// base.timeoutIntervalForRequest = 5
-    /// let session = mock.makeSession(configuration: base, interceptor: retryPolicy)
-    /// ```
-    ///
-    /// - Parameters:
-    ///   - configuration: The configuration to copy and wire to this server.
-    ///   - interceptor: An optional request interceptor, e.g. a `RetryPolicy`.
-    public func makeSession(
-        configuration: URLSessionConfiguration,
-        interceptor: (any RequestInterceptor)? = nil
-    ) -> Session {
-        Session(
-            configuration: makeURLSessionConfiguration(base: configuration),
-            interceptor: interceptor
-        )
-    }
-
     // MARK: - Routes
 
-    /// Registers a route and returns it for configuration.
+    /// Registers a route for a request pattern and returns it for configuration.
     ///
-    /// - Parameters:
-    ///   - method: The method to match, or `nil` for any method.
-    ///   - path: A path pattern, evaluated against the request path. `:name` captures a
-    ///     segment, `*` matches one segment, and a trailing `**` matches the remainder.
-    ///     A query string in `path` (e.g. `"/search?q=swift"`) adds required query items.
+    /// ```swift
+    /// mock.on(.get("/users/:id")).respond(.json(["id": 42, "name": "Ada"]))
+    /// ```
+    ///
+    /// - Parameter pattern: The method and path to match. An omitted component matches
+    ///   anything; see ``RoutePattern``.
     @discardableResult
-    public func on(_ method: HTTPMethod? = nil, _ path: String = "**") -> MockRoute {
-        let route = MockRoute(server: self, method: method, path: path)
+    public func on(_ pattern: RoutePattern) -> MockRoute {
+        let route = MockRoute(server: self, pattern: pattern)
         lock.sync {
             routes.append(route)
         }
         return route
-    }
-
-    /// Registers a route that matches any HTTP method.
-    @discardableResult
-    public func onAnyRequest(_ path: String = "**") -> MockRoute {
-        on(nil, path)
-    }
-
-    /// Registers a `GET` route.
-    @discardableResult
-    public func onGet(_ path: String = "**") -> MockRoute {
-        on(.get, path)
-    }
-
-    /// Registers a `POST` route.
-    @discardableResult
-    public func onPost(_ path: String = "**") -> MockRoute {
-        on(.post, path)
-    }
-
-    /// Registers a `PUT` route.
-    @discardableResult
-    public func onPut(_ path: String = "**") -> MockRoute {
-        on(.put, path)
-    }
-
-    /// Registers a `PATCH` route.
-    @discardableResult
-    public func onPatch(_ path: String = "**") -> MockRoute {
-        on(.patch, path)
-    }
-
-    /// Registers a `DELETE` route.
-    @discardableResult
-    public func onDelete(_ path: String = "**") -> MockRoute {
-        on(.delete, path)
-    }
-
-    /// Registers a `HEAD` route.
-    @discardableResult
-    public func onHead(_ path: String = "**") -> MockRoute {
-        on(.head, path)
-    }
-
-    /// Registers an `OPTIONS` route.
-    @discardableResult
-    public func onOptions(_ path: String = "**") -> MockRoute {
-        on(.options, path)
     }
 
     /// The routes currently registered, in registration order.
@@ -285,32 +208,29 @@ public final class MockServer: @unchecked Sendable {
         recordedRequests.filter { matcher.matches($0) }
     }
 
+    /// Verifies how many requests matching a pattern the server recorded.
+    ///
+    /// - Parameters:
+    ///   - pattern: The method and path to match.
+    ///   - times: The exact number of expected matches. Defaults to `1`.
+    public func verify(_ pattern: RoutePattern, times: Int = 1) -> MockVerification {
+        verify(matching: RequestMatcher(method: pattern.method, path: pattern.path), times: times)
+    }
+
     /// Verifies how many requests matching `matcher` the server recorded.
+    ///
+    /// Use this overload when the expectation needs constraints beyond method and path
+    /// (host, query items, headers, or body).
     ///
     /// - Parameters:
     ///   - matcher: The request matcher.
     ///   - times: The exact number of expected matches. Defaults to `1`.
-    public func verify(_ matcher: RequestMatcher, times: Int = 1) -> MockVerification {
+    public func verify(matching matcher: RequestMatcher, times: Int = 1) -> MockVerification {
         MockVerification(
             matcher: matcher,
             expectedCount: times,
             matchingRequests: recordedRequests(matching: matcher)
         )
-    }
-
-    /// Verifies how many requests with the given method (and optional path pattern) the
-    /// server recorded.
-    ///
-    /// - Parameters:
-    ///   - method: The HTTP method to match.
-    ///   - path: An optional path pattern. When `nil`, any path matches.
-    ///   - times: The exact number of expected matches. Defaults to `1`.
-    public func verify(
-        _ method: HTTPMethod,
-        _ path: String? = nil,
-        times: Int = 1
-    ) -> MockVerification {
-        verify(RequestMatcher(method: method, path: path), times: times)
     }
 
     // MARK: - Behavior
@@ -399,8 +319,8 @@ public final class MockServer: @unchecked Sendable {
             )
         case let .respond(response):
             return Resolution(request: request, response: response, error: nil)
-        case let .failWith(error):
-            return Resolution(request: request, response: nil, error: error)
+        case let .failWith(code):
+            return Resolution(request: request, response: nil, error: URLError(code))
         }
     }
 
@@ -413,10 +333,11 @@ public final class MockServer: @unchecked Sendable {
         let payload: [String: Any] = [
             "error": "No mock route matched \(request.method.rawValue) \(request.url.absoluteString)",
             "registeredRoutes": registeredRoutes,
-            "hint": "Register a matching route, e.g. mock.on(.get, \"/path\").respond(.json([...]))",
+            "hint":
+                "Register a matching route, e.g. mock.on(.get(\"/path\")).respond(.json([...]))",
         ]
 
         return MockResponse.json(payload, status: 500)
-            .withHeader("X-Alamock-Error", "unmatched-request")
+            .with(header: "X-Alamock-Error", "unmatched-request")
     }
 }

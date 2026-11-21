@@ -3,11 +3,10 @@
 //  Alamock
 //
 
-import Alamofire
 import Foundation
 
 /// A composable description of the requests matching a ``MockRoute`` or a
-/// ``MockServer/verify(_:times:)-`` assertion.
+/// ``MockServer/verify(matching:times:)`` assertion.
 ///
 /// Every property is optional; only the properties you set constrain matching. A matcher
 /// with no constraints matches every request.
@@ -105,7 +104,7 @@ public struct RequestMatcher: Sendable, CustomStringConvertible {
 
         var captured: [String: String] = [:]
         if let path {
-            guard let parameters = path.match(path: request.path) else { return nil }
+            guard let parameters = path.captures(in: request.path) else { return nil }
             captured = parameters
         }
 

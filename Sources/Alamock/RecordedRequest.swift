@@ -3,7 +3,6 @@
 //  Alamock
 //
 
-import Alamofire
 import Foundation
 
 /// An immutable snapshot of an HTTP request that reached a ``MockServer``.

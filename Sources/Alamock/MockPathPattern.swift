@@ -20,7 +20,7 @@ import Foundation
 ///
 /// ```swift
 /// let pattern = MockPathPattern("/users/:id/repos/*")
-/// pattern.match(path: "/users/42/repos/alamock")
+/// pattern.captures(in: "/users/42/repos/alamock")
 /// // ["id": "42"]
 /// ```
 public struct MockPathPattern: Sendable, Equatable, CustomStringConvertible {
@@ -72,7 +72,7 @@ public struct MockPathPattern: Sendable, Equatable, CustomStringConvertible {
     /// - Parameter path: A percent-decoded path such as `/users/42`.
     /// - Returns: A dictionary of captured `:name` segments, or `nil` when the path does
     ///   not match. An empty dictionary means the path matched without parameters.
-    public func match(path: String) -> [String: String]? {
+    public func captures(in path: String) -> [String: String]? {
         if matchesEverything {
             return [:]
         }

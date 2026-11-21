@@ -5,7 +5,7 @@
 
 import Foundation
 
-/// The result of a ``MockServer/verify(_:times:)-`` assertion.
+/// The result of a ``MockServer/verify(_:times:)`` assertion.
 ///
 /// Verification is deliberately not tied to any test framework: assert on ``isSatisfied``
 /// (for example `#expect(verification.isSatisfied, "\(verification.failureMessage)")`) or on
@@ -47,7 +47,7 @@ public struct MockVerification: Sendable, CustomStringConvertible {
     /// Pass this as the message of a Swift Testing `#expect`:
     ///
     /// ```swift
-    /// let verification = mock.verify(.post, "/login")
+    /// let verification = mock.verify(.post("/login"))
     /// #expect(verification.isSatisfied, "\(verification.failureMessage)")
     /// ```
     public var failureMessage: String {
