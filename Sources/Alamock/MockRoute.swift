@@ -3,7 +3,6 @@
 //  Alamock
 //
 
-import Alamofire
 import Foundation
 
 /// A route registered on a ``MockServer``.

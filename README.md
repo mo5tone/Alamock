@@ -72,7 +72,7 @@ final class UserServiceTests {
 
     init() {
         mock = MockServer(name: "UserServiceTests")
-        session = mock.makeSession()
+        session = mock.af.session()
     }
 
     deinit {
@@ -120,10 +120,14 @@ let response = await withCheckedContinuation { continuation in
 3. The URL cache is disabled and cache policy is forced to reload-ignoring-cache.
 
 ```swift
-let session = mock.makeSession()            // new ephemeral session wired to the mock
+let session = mock.af.session()            // new ephemeral session wired to the mock
 let configuration = mock.makeURLSessionConfiguration(base: .default) // or customize a base
 mock.configure(existingConfiguration)       // or wire an existing configuration in place
 ```
+
+Alamofire conveniences are namespaced under `mock.af` (think RxSwift's `.rx`). The
+configuration and routing API is Foundation-only, so `import Alamofire` is only needed
+when you actually ask `af` for a `Session`.
 
 Request flow:
 
@@ -330,8 +334,8 @@ several servers can be active at once without interfering:
 let publicAPI = MockServer(name: "PublicAPI")
 let authAPI = MockServer(name: "AuthAPI")
 
-let publicSession = publicAPI.makeSession()
-let authSession = authAPI.makeSession()
+let publicSession = publicAPI.af.session()
+let authSession = authAPI.af.session()
 ```
 
 For a process-wide default server, use `MockServer.shared` and reset it between tests.
@@ -342,7 +346,7 @@ To keep production-like session settings, build on top of an existing configurat
 let base = URLSessionConfiguration.ephemeral
 base.timeoutIntervalForRequest = 5
 let retry = RetryPolicy(retryLimit: 3, exponentialBackoffScale: 0)
-let session = mock.makeSession(configuration: base, interceptor: retry)
+let session = mock.af.session(configuration: base, interceptor: retry)
 ```
 
 Raw `URLSession` works too — no Alamofire required for the mock itself:

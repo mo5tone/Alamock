@@ -3,7 +3,6 @@
 //  Alamock
 //
 
-import Alamofire
 import Foundation
 
 /// What a ``MockServer`` does with a request that matches no registered route.
@@ -29,6 +28,9 @@ public enum UnmatchedRequestBehavior: Sendable {
 /// unmodified: parameter encoding, response serializers, validation, retriers, and
 /// interceptors all behave as they do in production.
 ///
+/// Alamofire-specific helpers live under ``af``; the routing and configuration API is
+/// independent of Alamofire.
+///
 /// ```swift
 /// @Suite("UserService")
 /// final class UserServiceTests {
@@ -36,7 +38,7 @@ public enum UnmatchedRequestBehavior: Sendable {
 ///     private let session: Session
 ///
 ///     init() {
-///         session = mock.makeSession()
+///         session = mock.af.session()
 ///         mock.on(.get, "/users/:id").respond(.json(["id": 42, "name": "Ada"]))
 ///     }
 ///
@@ -144,38 +146,6 @@ public final class MockServer: @unchecked Sendable {
 
         configuration.urlCache = nil
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-    }
-
-    /// Creates an Alamofire `Session` wired to this server.
-    ///
-    /// - Parameter interceptor: An optional request interceptor, e.g. a `RetryPolicy`.
-    ///   All interceptors run normally because the mock only replaces the transport.
-    public func makeSession(interceptor: (any RequestInterceptor)? = nil) -> Session {
-        Session(configuration: makeURLSessionConfiguration(), interceptor: interceptor)
-    }
-
-    /// Creates an Alamofire `Session` from a customized configuration and this server.
-    ///
-    /// Use this to keep production settings such as timeouts, headers, and a custom
-    /// `URLSessionDelegate` while routing the session through the mock:
-    ///
-    /// ```swift
-    /// let base = URLSessionConfiguration.ephemeral
-    /// base.timeoutIntervalForRequest = 5
-    /// let session = mock.makeSession(configuration: base, interceptor: retryPolicy)
-    /// ```
-    ///
-    /// - Parameters:
-    ///   - configuration: The configuration to copy and wire to this server.
-    ///   - interceptor: An optional request interceptor, e.g. a `RetryPolicy`.
-    public func makeSession(
-        configuration: URLSessionConfiguration,
-        interceptor: (any RequestInterceptor)? = nil
-    ) -> Session {
-        Session(
-            configuration: makeURLSessionConfiguration(base: configuration),
-            interceptor: interceptor
-        )
     }
 
     // MARK: - Routes

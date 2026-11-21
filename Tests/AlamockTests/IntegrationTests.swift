@@ -16,7 +16,7 @@ final class IntegrationTests {
 
     init() {
         server = MockServer(name: "IntegrationTests")
-        session = server.makeSession()
+        session = server.af.session()
     }
 
     deinit {
@@ -349,7 +349,7 @@ final class IntegrationTests {
     }
 
     @Test func retryPolicyRetriesMockedFailure() async throws {
-        let retrySession = server.makeSession(
+        let retrySession = server.af.session(
             interceptor: RetryPolicy(
                 retryLimit: 2,
                 exponentialBackoffScale: 0,
@@ -486,8 +486,8 @@ final class IntegrationTests {
     @Test func twoServersAreIsolated() async throws {
         let serverA = MockServer(name: "A")
         let serverB = MockServer(name: "B")
-        let sessionA = serverA.makeSession()
-        let sessionB = serverB.makeSession()
+        let sessionA = serverA.af.session()
+        let sessionB = serverB.af.session()
         defer {
             sessionA.session.invalidateAndCancel()
             sessionB.session.invalidateAndCancel()
@@ -729,12 +729,12 @@ final class IntegrationTests {
         #expect(recorded.header("X-Custom") == "custom-value")
     }
 
-    @Test func makeSessionWithCustomConfiguration() async throws {
+    @Test func sessionWithCustomConfiguration() async throws {
         let base = URLSessionConfiguration.ephemeral
         base.timeoutIntervalForRequest = 12
         base.httpAdditionalHeaders = ["X-Base": "kept"]
 
-        let customSession = server.makeSession(configuration: base)
+        let customSession = server.af.session(configuration: base)
         defer { customSession.session.invalidateAndCancel() }
 
         server.onGet("/configured").respond(.text("ok"))

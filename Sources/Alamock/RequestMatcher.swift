@@ -3,7 +3,6 @@
 //  Alamock
 //
 
-import Alamofire
 import Foundation
 
 /// A composable description of the requests matching a ``MockRoute`` or a

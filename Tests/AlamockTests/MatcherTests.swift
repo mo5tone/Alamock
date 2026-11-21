@@ -3,7 +3,6 @@
 //  AlamockTests
 //
 
-import Alamofire
 import Foundation
 import Testing
 @testable import Alamock
