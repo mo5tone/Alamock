@@ -6,7 +6,7 @@
 import Foundation
 
 /// A composable description of the requests matching a ``MockRoute`` or a
-/// ``MockServer/verify(_:times:)-`` assertion.
+/// ``MockServer/verify(matching:times:)-`` assertion.
 ///
 /// Every property is optional; only the properties you set constrain matching. A matcher
 /// with no constraints matches every request.

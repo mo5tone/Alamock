@@ -47,7 +47,7 @@ public struct MockVerification: Sendable, CustomStringConvertible {
     /// Pass this as the message of a Swift Testing `#expect`:
     ///
     /// ```swift
-    /// let verification = mock.verify(.post, "/login")
+    /// let verification = mock.verify(.post("/login"))
     /// #expect(verification.isSatisfied, "\(verification.failureMessage)")
     /// ```
     public var failureMessage: String {

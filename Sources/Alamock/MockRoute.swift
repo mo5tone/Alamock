@@ -7,14 +7,14 @@ import Foundation
 
 /// A route registered on a ``MockServer``.
 ///
-/// Routes are created with ``MockServer/on(_:_:)-`` and are evaluated in reverse
+/// Routes are created with ``MockServer/on(_:)-`` and are evaluated in reverse
 /// registration order: the most recently registered matching route wins. This makes it
 /// easy for a single test to override a route registered in `setUp()`.
 ///
 /// Routes are configured with a chainable API:
 ///
 /// ```swift
-/// mock.on(.post, "/users/:id")
+/// mock.on(.post("/users/:id"))
 ///     .match(header: "Authorization", "Bearer token")
 ///     .match(jsonBody: ["name": "Ada"])
 ///     .respond(.json(["id": 1], status: 201))
@@ -23,7 +23,8 @@ public final class MockRoute: @unchecked Sendable, CustomStringConvertible {
     /// The required HTTP method, or `nil` for any method.
     public let method: HTTPMethod?
 
-    /// The path pattern this route was registered with.
+    /// The path pattern this route was registered with, or `"**"` when the route accepts
+    /// any path.
     public let path: String
 
     private weak var server: MockServer?
@@ -34,11 +35,11 @@ public final class MockRoute: @unchecked Sendable, CustomStringConvertible {
 
     // MARK: - Init
 
-    init(server: MockServer, method: HTTPMethod?, path: String) {
+    init(server: MockServer, pattern: RoutePattern) {
         self.server = server
-        self.method = method
-        self.path = path
-        self.matcher = RequestMatcher(method: method, path: path)
+        self.method = pattern.method
+        self.path = pattern.path ?? "**"
+        self.matcher = RequestMatcher(method: pattern.method, path: pattern.path)
         self.responder = .default
     }
 
@@ -118,7 +119,7 @@ public final class MockRoute: @unchecked Sendable, CustomStringConvertible {
     /// Adds an arbitrary predicate that is evaluated after all other constraints.
     ///
     /// ```swift
-    /// mock.on(.get, "/search").match { request in
+    /// mock.on(.get("/search")).match { request in
     ///     request.query["q"]?.count ?? 0 > 3
     /// }
     /// ```
@@ -153,7 +154,7 @@ public final class MockRoute: @unchecked Sendable, CustomStringConvertible {
     /// This is useful for retry, pagination, and token-refresh scenarios:
     ///
     /// ```swift
-    /// mock.on(.get, "/flaky").respond(sequence: [.status(500), .json(["ok": true])])
+    /// mock.on(.get("/flaky")).respond(sequence: [.status(500), .json(["ok": true])])
     /// ```
     ///
     /// - Parameters:
@@ -181,7 +182,7 @@ public final class MockRoute: @unchecked Sendable, CustomStringConvertible {
     /// parameters, so responses can vary by request:
     ///
     /// ```swift
-    /// mock.on(.get, "/users/:id").respond { request in
+    /// mock.on(.get("/users/:id")).respond { request in
     ///     .json(["id": request.pathParameters["id"]!])
     /// }
     /// ```

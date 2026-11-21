@@ -11,7 +11,7 @@ serializers, `.validate()`, `RetryPolicy`, request interceptors, event monitors,
 is subclassed, forked, or patched — mock only the transport.
 
 ```swift
-mock.on(.get, "/users/42").respond(.json(["id": 42, "name": "Ada"]))
+mock.on(.get("/users/42")).respond(.json(["id": 42, "name": "Ada"]))
 ```
 
 - Routes with method, path patterns, query items, headers, JSON/form bodies, and predicates.
@@ -81,7 +81,7 @@ final class UserServiceTests {
     }
 
     @Test func loadsUser() async throws {
-        mock.on(.get, "/users/42").respond(.json(["id": 42, "name": "Ada"]))
+        mock.on(.get("/users/42")).respond(.json(["id": 42, "name": "Ada"]))
 
         let user = try await session
             .request("https://api.example.com/users/42")
@@ -91,7 +91,7 @@ final class UserServiceTests {
 
         #expect(user.name == "Ada")
 
-        let verification = mock.verify(.get, "/users/42")
+        let verification = mock.verify(.get("/users/42"))
         #expect(verification.isSatisfied, "\(verification.failureMessage)")
     }
 }
@@ -159,7 +159,7 @@ response serializers, redirect handling, and event monitors.
 | `/users/:id` | `/users/42`, `/users/ada` | `id` |
 | `/files/*/metadata` | `/files/report/metadata` | — |
 | `/files/**` | `/files`, `/files/a/b/c.txt` | — |
-| `**` (default) | every path | — |
+| `**` | every path | — |
 
 Trailing slashes are ignored. `:name` captures are available as
 `RecordedRequest.pathParameters` and inside predicates and responders.
@@ -167,17 +167,28 @@ Trailing slashes are ignored. `:name` captures are available as
 A query string embedded in the path adds required query items:
 
 ```swift
-mock.on(.get, "/search?q=swift").respond(.json(["results": []]))
+mock.on(.get("/search?q=swift")).respond(.json(["results": []]))
+```
+
+### Route patterns
+
+Routes are created with `on(_:)` from a `RoutePattern`: a method plus an optional path
+pattern. An omitted component matches anything:
+
+```swift
+mock.on(.get("/users/42"))   // GET /users/42
+mock.on(.get("/users/:id"))  // GET /users/42, /users/ada, …
+mock.on(.get())              // any GET request
+mock.on(.any("/webhooks"))   // any method on /webhooks
+mock.on(.any)                // every request
 ```
 
 ### Matching constraints
 
-All constraints are optional and combined with AND. Routes are created with
-`on(_:_:)`: pass the method to match (or `nil` for any method) and an optional path
-pattern (defaults to `**`, matching every path).
+A route can be constrained further. All constraints are optional and combined with AND:
 
 ```swift
-mock.on(.post, "/users/:id")
+mock.on(.post("/users/:id"))
     .match(host: "api.example.com")
     .match(queryItems: ["notify": "true"])
     .match(header: "Authorization", "Bearer token")  // nil value = header must exist
@@ -200,7 +211,7 @@ Body matchers:
 Predicates run last and see the path parameters captured by the route's pattern:
 
 ```swift
-mock.on(.get, "/users/:id").match { request in
+mock.on(.get("/users/:id")).match { request in
     request.pathParameters["id"] == "42"
 }
 ```
@@ -212,10 +223,10 @@ matching route wins. This makes it easy for a test to override a route registere
 `setUp()`:
 
 ```swift
-mock.on(.get, "/ping").respond(.text("default"))
+mock.on(.get("/ping")).respond(.text("default"))
 // later in a test:
-let override = mock.on(.get, "/ping").respond(.text("override")) // wins
-override.remove()                                             // back to "default"
+let override = mock.on(.get("/ping")).respond(.text("override")) // wins
+override.remove()                                                // back to "default"
 ```
 
 ---
@@ -251,9 +262,9 @@ Modifiers return a copy:
 For retry, pagination, and token-refresh scenarios:
 
 ```swift
-mock.on(.get, "/flaky").respond(sequence: [.status(500), .text("ok")])
+mock.on(.get("/flaky")).respond(sequence: [.status(500), .text("ok")])
 
-mock.on(.get, "/paged").respond(
+mock.on(.get("/paged")).respond(
     sequence: [.json(["page": 1]), .json(["page": 2])],
     repeatingLast: false // further requests fail with .responseSequenceExhausted
 )
@@ -262,12 +273,12 @@ mock.on(.get, "/paged").respond(
 ### Dynamic responders
 
 ```swift
-mock.on(.get, "/users/:id").respond { request in
+mock.on(.get("/users/:id")).respond { request in
     let id = request.pathParameters["id"] ?? "unknown"
     return .json(["id": id])
 }
 
-mock.on(.post, "/login").respond { request in
+mock.on(.post("/login")).respond { request in
     request.jsonBody()?["password"] as? String == "secret"
         ? .json(["token": "abc"])
         : .status(401)
@@ -299,12 +310,15 @@ mock.reset()                          // drop routes, recordings, and restore de
 Verification is deliberately framework-agnostic; assert on `isSatisfied` or `actualCount`:
 
 ```swift
-let verification = mock.verify(.post, "/login", times: 2)
+let verification = mock.verify(.post("/login"), times: 2)
 #expect(verification.isSatisfied, "\(verification.failureMessage)")
+
+// A path-less pattern verifies a method across every path:
+#expect(mock.verify(.get()).wasCalled)
 
 // Or with full matcher control:
 let matcher = RequestMatcher(method: .get, path: "/users/:id", headers: ["X-Env": "test"])
-#expect(mock.verify(matcher, times: 1).actualCount == 1)
+#expect(mock.verify(matching: matcher, times: 1).actualCount == 1)
 ```
 
 `MockVerification` also provides `matchingRequests`, `wasCalled`, and `failureMessage`
@@ -431,6 +445,7 @@ Sources/Alamock/
 ├── MockResponse.swift        # response descriptions, builders, modifiers
 ├── MockBodyMatcher.swift     # request body matchers
 ├── MockPathPattern.swift     # :param / * / ** path patterns
+├── RoutePattern.swift        # method + path literal for routes and verification
 ├── RequestMatcher.swift      # composable matcher (routes + verification)
 ├── RecordedRequest.swift     # recorded request snapshot
 ├── MockVerification.swift    # verification result

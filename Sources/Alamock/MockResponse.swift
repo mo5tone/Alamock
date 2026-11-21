@@ -14,10 +14,10 @@ import Foundation
 /// delay, and an optional transport-level failure.
 ///
 /// ```swift
-/// mock.on(.get, "/users/1").respond(.json(["id": 1, "name": "Ada"], status: 200))
-/// mock.on(.post, "/login").respond(.status(401).with(header: "WWW-Authenticate", "Bearer"))
-/// mock.on(.get, "/slow").respond(.json([:]).delayed(by: 0.5))
-/// mock.on(.get, "/offline").respond(.error(.notConnectedToInternet))
+/// mock.on(.get("/users/1")).respond(.json(["id": 1, "name": "Ada"], status: 200))
+/// mock.on(.post("/login")).respond(.status(401).with(header: "WWW-Authenticate", "Bearer"))
+/// mock.on(.get("/slow")).respond(.json([:]).delayed(by: 0.5))
+/// mock.on(.get("/offline")).respond(.error(.notConnectedToInternet))
 /// ```
 public struct MockResponse: Sendable {
     /// The HTTP status code of the emulated response.
@@ -171,8 +171,8 @@ public struct MockResponse: Sendable {
     /// A redirect response with a `Location` header.
     ///
     /// ```swift
-    /// mock.on(.get, "/old").respond(.redirect(to: "/new"))
-    /// mock.on(.get, "/new").respond(.text("moved"))
+    /// mock.on(.get("/old")).respond(.redirect(to: "/new"))
+    /// mock.on(.get("/new")).respond(.text("moved"))
     /// ```
     ///
     /// - Note: The mock transport reports the redirect to URLSession, which follows it
