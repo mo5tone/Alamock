@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # git commit-msg hook: reject commit messages that do not follow Conventional
-# Commits. Installed via `make hooks` (sets core.hooksPath to .githooks).
+# Commits. Installed via `mise run hooks` (sets core.hooksPath to .githooks).
 #
 # Bypass for emergencies with `git commit --no-verify`; CI re-validates the
 # commits on a push/PR, so a bypassed message still has to be fixed there.

@@ -1,7 +1,7 @@
 # SwiftLint configuration for Alamock.
 #
 # Formatting is owned by swift-format (see `.swift-format`); SwiftLint polices the
-# rules a formatter cannot express. Run both through `make lint` / `make verify`.
+# rules a formatter cannot express. Run both through `mise run lint` / `mise run verify`.
 
 included:
   - Sources

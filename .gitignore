@@ -12,3 +12,6 @@ xcuserdata/
 .idea/
 .vscode/
 *.swp
+
+# mise local overrides
+.mise.local.toml

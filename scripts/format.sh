@@ -4,7 +4,7 @@
 #
 # swift-format is the single source of truth for formatting in this repository;
 # `.swift-format` holds the configuration. Use `fix` before committing and let
-# `check` (which is what CI runs through `make verify`) catch drift.
+# `check` (which is what CI runs through `mise run lint`) catch drift.
 #
 # Usage:
 #   scripts/format.sh            # check only (default)
@@ -59,7 +59,7 @@ case "$mode" in
             --configuration "$configuration" \
             "${targets[@]}"; then
             echo "" >&2
-            echo "Formatting check failed. Run 'make format' and commit the result." >&2
+            echo "Formatting check failed. Run 'mise run format' and commit the result." >&2
             exit 1
         fi
         echo "formatting OK"

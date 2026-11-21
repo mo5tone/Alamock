@@ -391,21 +391,23 @@ conformances are limited to the lock-protected reference types (`MockServer`, `M
 
 ## Development
 
-The repository carries its own tooling: [swift-format](.swift-format) formats the
-sources, [SwiftLint](.swiftlint.yml) lints them, and a `Makefile` wraps both plus the
-test suite. Run `make` on its own to list every target.
+The repository pins its non-Xcode tooling with [mise](https://mise.jdx.dev/):
+[`.mise.toml`](.mise.toml) installs SwiftLint and defines the tasks below. Swift and
+swift-format come from Xcode. Install the pins once, then `mise tasks` lists every task.
 
 ```bash
-make format        # rewrite Sources, Tests and Package.swift with swift-format
-make format-check  # fail if anything is not formatted
-make lint          # SwiftLint --strict + the swift-format check
-make test          # swift test --parallel
-make verify        # everything CI enforces: lint + format check + tests
-make hooks         # install the commit-msg hook (Conventional Commits)
+mise install           # install SwiftLint 0.65.1
+mise run format        # rewrite Sources, Tests and Package.swift with swift-format
+mise run format-check  # fail if anything is not formatted
+mise run lint          # SwiftLint --strict + the swift-format check
+mise run test          # swift test --parallel
+mise run verify        # everything CI enforces: lint + tests
+mise run hooks         # install the commit-msg hook (Conventional Commits)
+mise run setup         # install tools and hooks in one step
 ```
 
-Formatting and linting are CI gates, so run `make format` before pushing and
-`make verify` before opening a pull request. Commit messages and pull request titles
+Formatting and linting are CI gates, so run `mise run format` before pushing and
+`mise run verify` before opening a pull request. Commit messages and pull request titles
 follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/); see
 [CONTRIBUTING.md](CONTRIBUTING.md) for the type/scope vocabulary, the hook setup and
 the squash-merge policy.
@@ -439,20 +441,21 @@ Every push to `main` and every pull request runs the workflows in
 
 | Workflow | Job | What it enforces |
 |---|---|---|
-| [`ci.yml`](.github/workflows/ci.yml) | **Build & test** | `swift build`, `swift test --parallel`, `swift build -c release`. |
-| [`ci.yml`](.github/workflows/ci.yml) | **Lint & format** | `make lint` (SwiftLint `--strict` plus the swift-format check) and `make format-check`. |
+| [`ci.yml`](.github/workflows/ci.yml) | **Build & test** | `swift build` (debug), `swift build -c release`, then `swift test --parallel`; runs only after the static checks pass. |
+| [`ci.yml`](.github/workflows/ci.yml) | **Lint & format** | `mise run lint`: SwiftLint `--strict` plus the swift-format check. |
 | [`ci.yml`](.github/workflows/ci.yml) | **Conventional Commits** | Every non-merge commit the push or pull request adds, via `scripts/validate-conventional-commits.sh`. |
 | [`pr-title.yml`](.github/workflows/pr-title.yml) | **Validate PR title** | The pull request title, which becomes the squash commit subject on `main`. |
-| [`release.yml`](.github/workflows/release.yml) | **Test & publish** | Release-mode tests, then a GitHub Release for a `vX.Y.Z` tag. |
+| [`release.yml`](.github/workflows/release.yml) | **Test & publish** | Static checks, a release build and release-mode tests, then a GitHub Release for a `vX.Y.Z` tag. |
 
-The toolchain is pinned so that a local `make verify` and CI agree: Xcode 27.2 (Swift
-6.4.2, swift-format 6.4.4) on the GitHub-hosted `xcode-27` image, plus the SwiftLint
-0.65.1 release binary checked against a recorded digest. Each job prints the resolved
-versions and fails with an explicit error when the image drifts — bump the `PINNED_*`
-values in the workflow and the version table in
-[CONTRIBUTING.md](CONTRIBUTING.md#requirements) together. `xcode-27` is a public preview
-image: if it ever stops providing the pinned Xcode, move the jobs to `macos-26` and drop
-the format gate for that pass, rather than letting CI format with a different toolchain.
+The toolchain is pinned so that a local `mise run verify` and CI agree: Xcode 27.2
+(Swift 6.4.2, swift-format 6.4.4) on the GitHub-hosted `xcode-27` image, and SwiftLint
+0.65.1 from [`.mise.toml`](.mise.toml) installed by `jdx/mise-action` with mise 2026.9.6.
+Each job prints the resolved versions and fails with an explicit error when the image
+drifts — bump the `PINNED_*` values in the workflow, the SwiftLint pin in `.mise.toml`
+and the version table in [CONTRIBUTING.md](CONTRIBUTING.md#requirements) together.
+`xcode-27` is a public preview image: if it ever stops providing the pinned Xcode, move
+the jobs to `macos-26` and drop the format gate for that pass, rather than letting CI
+format with a different toolchain.
 
 Releasing is a tag:
 

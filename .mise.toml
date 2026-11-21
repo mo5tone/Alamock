@@ -1,0 +1,72 @@
+# Tool and task definitions for Alamock.
+#
+# Swift and swift-format come from Xcode; mise only manages the tools that are
+# not part of the toolchain. Install the pins once per clone with `mise install`,
+# then run `mise tasks` to list the tasks (or `mise run` for the default task).
+#
+# CI pins the same SwiftLint version through jdx/mise-action; keep `.mise.toml`
+# and `.github/workflows/ci.yml` in sync when bumping it.
+
+[tools]
+swiftlint = "0.65.1"
+
+# Listing the tasks is the default action.
+[tasks.default]
+description = "List the available tasks"
+run = "mise tasks"
+
+[tasks.setup]
+description = "Install the pinned tools and the repository git hooks"
+run = [
+    "mise install",
+    "git config core.hooksPath .githooks",
+    "echo 'setup complete: tools installed and commit-msg hook enabled'",
+]
+
+[tasks.format]
+description = "Rewrite Sources, Tests and Package.swift with swift-format"
+run = "./scripts/format.sh fix"
+
+[tasks.format-check]
+description = "Verify formatting without changing files"
+run = "./scripts/format.sh check"
+
+[tasks.lint]
+description = "Run SwiftLint --strict and the swift-format check"
+run = "./scripts/lint.sh"
+
+[tasks.build]
+description = "Build the package (debug)"
+run = "swift build"
+
+[tasks.build-release]
+description = "Build the package (release)"
+run = "swift build -c release"
+
+[tasks.test]
+description = "Run the test suite in parallel"
+run = "swift test --parallel"
+
+[tasks.test-release]
+description = "Run the test suite in release configuration"
+run = "swift test -c release --parallel"
+
+# `lint` already runs the swift-format check, so verify is lint + tests.
+[tasks.verify]
+description = "Run the CI gate: lint, format check and tests"
+depends = ["lint", "test"]
+
+[tasks.hooks]
+description = "Install the repository git hooks (core.hooksPath=.githooks)"
+run = [
+    "git config core.hooksPath .githooks",
+    "echo 'hooks installed: commit-msg validates Conventional Commits (bypass with git commit --no-verify)'",
+]
+
+[tasks.clean]
+description = "Remove build artifacts"
+run = "rm -rf .build .swiftpm"
+
+[tasks.doctor]
+description = "Print the resolved tool versions"
+run = "swift --version; xcrun swift-format --version; swiftlint version"

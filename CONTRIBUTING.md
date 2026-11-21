@@ -20,46 +20,48 @@ enforces.
 | Swift | 6.4.2 | The package is in Swift 6 language mode (`swift-tools-version: 6.0`); any Swift 6.0+ toolchain builds it, CI uses 6.4.2. |
 | Xcode | 27.2 | Ships the pinned Swift and `xcrun swift-format`; any Xcode 16+ builds the package. |
 | [swift-format](https://github.com/swiftlang/swift-format) | 6.4.4 | Bundled with the toolchain: `xcrun swift-format`. |
-| [SwiftLint](https://github.com/realm/SwiftLint) | 0.65.1 | `brew install swiftlint` locally; CI downloads that release binary and verifies its digest. |
+| [mise](https://mise.jdx.dev/) | 2026.9.6 | Installs the non-Xcode tools and runs the tasks in [`.mise.toml`](.mise.toml). |
+| [SwiftLint](https://github.com/realm/SwiftLint) | 0.65.1 | Pinned in `.mise.toml`; install it with `mise install`. CI installs the same pin through `jdx/mise-action`. |
 
 CI selects `/Applications/Xcode_27.2.app` on the `xcode-27` runner image, installs the
-pinned SwiftLint release binary, prints the three versions, and fails when any of them
-differs from `PINNED_*` in `.github/workflows/ci.yml`. That is what keeps
-`make format-check` meaningful: a different swift-format build would report drift that
-does not exist, and a different SwiftLint would add rules mid-stream. A newer SwiftLint
-can enable new rules: if a local run reports violations that CI does not, update
-`.swiftlint.yml` in the same pull request rather than silently changing style. See
-[README "Continuous integration and releases"](README.md#continuous-integration-and-releases).
+tools pinned in `.mise.toml` through `jdx/mise-action`, prints the versions, and fails
+when Swift or swift-format differs from `PINNED_*` in `.github/workflows/ci.yml`. That
+is what keeps `mise run lint` meaningful: a different swift-format build would report
+drift that does not exist, and a different SwiftLint would add rules mid-stream. A newer
+SwiftLint can enable new rules: if a local run reports violations that CI does not,
+update `.swiftlint.yml` in the same pull request rather than silently changing style.
+See [README "Continuous integration and releases"](README.md#continuous-integration-and-releases).
 
 ## Setting up
 
 ```bash
 git clone https://github.com/mo5tone/Alamock.git
 cd Alamock
-brew install swiftlint   # 0.65.1 is the version CI pins
-make hooks    # installs the commit-msg hook (see below)
-make verify   # should be green before you change anything
+mise install     # installs SwiftLint 0.65.1 (Swift/swift-format come from Xcode)
+mise run hooks   # installs the commit-msg hook (see below)
+mise run verify  # should be green before you change anything
 ```
 
-`make hooks` runs `git config core.hooksPath .githooks`, which enables the repository's
-`commit-msg` hook for this clone. The hook is local configuration: it is not committed
-to anyone else's clone, and CI re-validates the same rules.
+`mise run hooks` runs `git config core.hooksPath .githooks`, which enables the
+repository's `commit-msg` hook for this clone. The hook is local configuration: it is
+not committed to anyone else's clone, and CI re-validates the same rules. `mise run
+setup` combines `mise install` and `mise run hooks`.
 
 ## Everyday commands
 
-Run `make` with no arguments to print the list of targets.
+Run `mise tasks` with no arguments to print the list of tasks.
 
 | Command | What it does |
 |---|---|
-| `make format` | Rewrite `Sources`, `Tests` and `Package.swift` with swift-format. |
-| `make format-check` | Verify formatting without touching files (fails on drift). |
-| `make lint` | `swiftlint lint --strict` followed by the swift-format check. |
-| `make test` | `swift test --parallel`. |
-| `make test-release` | `swift test -c release --parallel` (catches optimization-only issues). |
-| `make verify` | `lint` + `format-check` + `test` — the gate CI runs. |
-| `make hooks` | Install the repository git hooks. |
+| `mise run format` | Rewrite `Sources`, `Tests` and `Package.swift` with swift-format. |
+| `mise run format-check` | Verify formatting without touching files (fails on drift). |
+| `mise run lint` | `swiftlint lint --strict` followed by the swift-format check. |
+| `mise run test` | `swift test --parallel`. |
+| `mise run test-release` | `swift test -c release --parallel` (catches optimization-only issues). |
+| `mise run verify` | `lint` + `test` — the gate CI runs. |
+| `mise run hooks` | Install the repository git hooks. |
 
-Each target is a thin wrapper around `scripts/`, so the same commands work when invoked
+Each task is a thin wrapper around `scripts/`, so the same commands work when invoked
 directly and can be exported to other tooling:
 
 ```bash
@@ -83,12 +85,13 @@ swift-format owns formatting; do not hand-format around it. The configuration in
 Workflow:
 
 ```bash
-make format       # rewrite
-git diff          # review — formatting-only changes should be a separate commit
-make format-check # confirm a clean tree afterwards
+mise run format       # rewrite
+git diff              # review — formatting-only changes should be a separate commit
+mise run format-check # confirm a clean tree afterwards
 ```
 
-CI fails on `make format-check`, so an unformatted push is a red build.
+CI fails on `mise run lint`, which includes the format check, so an unformatted push is
+a red build.
 
 ## Linting
 
@@ -190,7 +193,7 @@ the message they wrap.
 ### The commit-msg hook
 
 ```bash
-make hooks                                  # once per clone
+mise run hooks                              # once per clone
 git commit -m "feat(tooling): add lint and format tooling"   # accepted
 git commit -m "update stuff"                                 # rejected
 ```
@@ -211,8 +214,8 @@ scripts/validate-conventional-commits.sh --text "feat(ci): cache the SwiftPM bui
 
 1. Branch from `main`: `feat/wildcard-segments`, `fix/redirect-recording`.
 2. Keep one logical change per pull request. Include tests for behavior changes.
-3. Run `make verify` — the same gate CI runs — and add `make test-release` for changes
-   that touch concurrency, locks, or anything optimization-sensitive.
+3. Run `mise run verify` — the same gate CI runs — and add `mise run test-release` for
+   changes that touch concurrency, locks, or anything optimization-sensitive.
 4. **Title the pull request with a Conventional Commits header.** We squash-merge only:
    the pull request title becomes the commit subject on `main`, and the pull request body
    becomes the commit body. A title that fails the message validator fails CI.
@@ -241,8 +244,9 @@ the pull-request gates, so use them only when that trade-off is intentional.
 Sources/Alamock/          # library
 Sources/Alamock/Internal/ # locking + weak server registry
 Tests/AlamockTests/       # integration and matcher tests
+.mise.toml                # SwiftLint pin + task definitions
 scripts/                  # format.sh, lint.sh, validate-conventional-commits.sh
-.githooks/                # commit-msg hook (installed with `make hooks`)
+.githooks/                # commit-msg hook (installed with `mise run hooks`)
 .github/workflows/        # ci.yml, pr-title.yml, release.yml
 .github/PULL_REQUEST_TEMPLATE.md  # PR body template (title becomes the squash subject)
 .github/actionlint.yaml   # actionlint metadata for the xcode-27 runner label
