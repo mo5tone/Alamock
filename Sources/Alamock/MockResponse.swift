@@ -206,6 +206,8 @@ public struct MockResponse: Sendable {
     }
 
     /// Returns a copy of the response with an added (or replaced) header.
+    ///
+    /// To add several headers at once, use ``with(headers:)``.
     public func with(header name: String, _ value: String) -> MockResponse {
         var copy = self
         copy.headers[name] = value
@@ -213,6 +215,9 @@ public struct MockResponse: Sendable {
     }
 
     /// Returns a copy of the response with additional headers.
+    ///
+    /// This is the plural form of ``with(header:_:)``: headers with the same name replace the
+    /// ones already present.
     public func with(headers additionalHeaders: [String: String]) -> MockResponse {
         var copy = self
         for (name, value) in additionalHeaders {

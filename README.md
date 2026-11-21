@@ -273,6 +273,9 @@ mock.on(.post("/users/:id"))
     .respond(.json(["id": 1], status: 201))
 ```
 
+`match(header:_:)` and `match(headers:)` are equivalent; the plural form requires every entry,
+and a later call on either form replaces an earlier requirement for the same header.
+
 Body matchers:
 
 ```swift
@@ -333,6 +336,9 @@ Modifiers return a copy:
         .delayed(by: 0.2)
 )
 ```
+
+`with(header:_:)` and `with(headers:)` are equivalent; both replace a header with the same
+name.
 
 ### Response sequences
 
