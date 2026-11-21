@@ -19,7 +19,7 @@ import Foundation
 ///     headers: ["Authorization": nil],        // header must be present
 ///     body: .json(["name": "Ada"])
 /// )
-/// XCTAssertTrue(matcher.matches(recordedRequest))
+/// #expect(matcher.matches(recordedRequest))
 /// ```
 public struct RequestMatcher: Sendable, CustomStringConvertible {
     /// The required HTTP method, or `nil` to accept any method.
