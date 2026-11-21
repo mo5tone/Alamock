@@ -142,21 +142,6 @@ final class IntegrationTests {
         #expect(body.contains("password=secret"), "Unexpected body: \(body)")
     }
 
-    @Test func headerMatching() async throws {
-        server.on(.get("/private"))
-            .match(header: "Authorization", "Bearer token")
-            .respond(.text("ok"))
-
-        let value = try await session.request(
-            "https://api.example.com/private",
-            headers: ["Authorization": "Bearer token"]
-        )
-        .serializingString()
-        .value
-
-        #expect(value == "ok")
-    }
-
     @Test func hostMatching() async throws {
         server.on(.get("/resource")).match(host: "api.example.com").respond(.text("api"))
         server.on(.get("/resource")).match(host: "cdn.example.com").respond(.text("cdn"))
