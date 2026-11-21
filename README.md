@@ -566,6 +566,11 @@ that tag. A tag that is not semver, or a failing suite, publishes nothing; no bi
 attached, because SwiftPM resolves the package by tag. The version in `Package.swift` is
 not rewritten by the workflow.
 
+Release notes group pull requests by the type labels applied from their Conventional Commit
+titles: [`.github/release.yml`](.github/release.yml) defines the categories, and
+[`.github/workflows/pr-labels.yml`](.github/workflows/pr-labels.yml) keeps the labels in
+sync with the title.
+
 Pull requests land as a single squashed commit titled by the pull request title and
 described by its body, so `main` stays a linear list of Conventional Commits. See
 [CONTRIBUTING.md](CONTRIBUTING.md#pull-requests) for the branch, title, and review rules.

@@ -1,0 +1,35 @@
+# Categories for the release notes that `gh release create --generate-notes` builds.
+# The labels below are applied from pull request titles by
+# .github/workflows/pr-labels.yml; see CONTRIBUTING.md for the Conventional Commits
+# types behind them.
+#
+# Categories are evaluated in order, and a pull request is listed under the first
+# category whose label it carries, so `breaking` comes first.
+changelog:
+  categories:
+    - title: Breaking Changes
+      labels:
+        - breaking
+    - title: Features
+      labels:
+        - feat
+    - title: Bug Fixes
+      labels:
+        - fix
+    - title: Performance
+      labels:
+        - perf
+    - title: Documentation
+      labels:
+        - docs
+    - title: Refactoring
+      labels:
+        - refactor
+    - title: Tests, Build & CI
+      labels:
+        - test
+        - build
+        - ci
+    - title: Other Changes
+      labels:
+        - "*"
