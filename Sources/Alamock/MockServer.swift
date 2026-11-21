@@ -20,16 +20,16 @@ public enum UnmatchedRequestBehavior: Sendable {
     case failWith(URLError.Code)
 }
 
-/// A stateful, pluggable mock HTTP server for Alamofire unit tests.
+/// A stateful, pluggable mock HTTP server for `URLSession`-based unit tests.
 ///
 /// A `MockServer` owns routes, records every request it receives, and is bound to a
-/// `URLSession` through a custom `URLProtocol`. Because the mock plugs into URLSession —
-/// the only seam Alamofire's public API exposes — the entire Alamofire stack runs
-/// unmodified: parameter encoding, response serializers, validation, retriers, and
+/// `URLSession` through a custom `URLProtocol`. Because the mock plugs into `URLSession`,
+/// unmodified client code keeps its normal networking behavior: with an Alamofire
+/// `Session`, parameter encoding, response serializers, validation, retriers, and
 /// interceptors all behave as they do in production.
 ///
 /// Alamofire-specific helpers live under ``af``; the routing and configuration API is
-/// independent of Alamofire.
+/// Foundation-only and independent of Alamofire.
 ///
 /// ```swift
 /// @Suite("UserService")
