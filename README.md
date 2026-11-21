@@ -2,13 +2,16 @@
 
 [![CI](https://github.com/mo5tone/Alamock/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/mo5tone/Alamock/actions/workflows/ci.yml)
 
-A pluggable networking mock for [Alamofire](https://github.com/Alamofire/Alamofire) unit tests.
+A pluggable networking mock for `URLSession` unit tests, with first-class
+[Alamofire](https://github.com/Alamofire/Alamofire) support.
 
-`Alamock` plugs into `URLSession` through its public `URLProtocol` seam, so it works
-with the **unmodified** Alamofire stack: `Session`, parameter encoding, response
-serializers, `.validate()`, `RetryPolicy`, request interceptors, event monitors, and
-`redirectHandler` all run exactly as they do against a real server. Nothing in Alamofire
-is subclassed, forked, or patched — mock only the transport.
+`Alamock` plugs into `URLSession` through its public `URLProtocol` seam, so it works with
+**unmodified** `URLSession` code and with the **unmodified** Alamofire stack. When you use
+Alamofire, `Session`, parameter encoding, response serializers, `.validate()`,
+`RetryPolicy`, request interceptors, event monitors, and `redirectHandler` all run exactly
+as they do against a real server. Nothing is subclassed, forked, or patched — mock only the
+transport. The core API is Foundation-only; Alamofire is optional and grouped under
+`mock.af`.
 
 ```swift
 mock.on(.get("/users/42")).respond(.json(["id": 42, "name": "Ada"]))
@@ -29,17 +32,22 @@ mock.on(.get("/users/42")).respond(.json(["id": 42, "name": "Ada"]))
 |---|---|
 | Swift | 6.0+ (package `swift-tools-version: 6.0`, Swift 6 language mode) |
 | Xcode | 16+ |
-| Alamofire | 5.10+ (built and tested against 5.12.2) |
 | Platforms | macOS 10.15+, iOS 13+, tvOS 13+, watchOS 6+ |
+| Alamofire | 5.10+ (built and tested against 5.12.2) — optional, needed only for `mock.af` |
+
+The routing, configuration, and verification APIs are Foundation-only. The package
+currently ships the Alamofire integration in the same target, so SwiftPM resolves
+Alamofire even when your tests never mention it.
 
 ## Installation
 
-Add the package to your project and link `Alamock` from your **test target**:
+Add the package to your project and link `Alamock` from your **test target**.
+
+A plain `URLSession` needs nothing else:
 
 ```swift
 // Package.swift
 dependencies: [
-    .package(url: "https://github.com/Alamofire/Alamofire.git", from: "5.10.2"),
     .package(path: "../Alamock"), // or the package's published URL
 ],
 targets: [
@@ -50,9 +58,77 @@ targets: [
 ]
 ```
 
+To drive Alamofire's `Session` in tests, add Alamofire as well:
+
+```swift
+// Package.swift
+dependencies: [
+    .package(url: "https://github.com/Alamofire/Alamofire.git", from: "5.10.2"),
+    .package(path: "../Alamock"), // or the package's published URL
+],
+targets: [
+    .testTarget(
+        name: "MyAppTests",
+        dependencies: [
+            "MyApp",
+            "Alamock",
+            .product(name: "Alamofire", package: "Alamofire"),
+        ]
+    ),
+]
+```
+
 ---
 
 ## Quick start
+
+### Plain `URLSession`
+
+```swift
+import Alamock
+import Foundation
+import Testing
+
+private struct User: Decodable {
+    let id: Int
+    let name: String
+}
+
+@Suite("UserService")
+final class UserServiceTests {
+    private let mock: MockServer
+    private let session: URLSession
+
+    init() {
+        mock = MockServer(name: "UserServiceTests")
+        session = URLSession(configuration: mock.makeURLSessionConfiguration())
+    }
+
+    deinit {
+        session.invalidateAndCancel()
+        mock.reset()
+    }
+
+    @Test func loadsUser() async throws {
+        mock.on(.get("/users/42")).respond(.json(["id": 42, "name": "Ada"]))
+
+        let (data, response) = try await session.data(
+            from: URL(string: "https://api.example.com/users/42")!
+        )
+
+        #expect((response as? HTTPURLResponse)?.statusCode == 200)
+        #expect(try JSONDecoder().decode(User.self, from: data).name == "Ada")
+
+        let verification = mock.verify(.get("/users/42"))
+        #expect(verification.isSatisfied, "\(verification.failureMessage)")
+    }
+}
+```
+
+### With Alamofire
+
+`mock.af` groups the helpers that hand back Alamofire types; the rest of the API stays
+Foundation-only, so `import Alamofire` is only needed when you ask `af` for a `Session`.
 
 ```swift
 import Alamofire
@@ -120,9 +196,11 @@ let response = await withCheckedContinuation { continuation in
 3. The URL cache is disabled and cache policy is forced to reload-ignoring-cache.
 
 ```swift
-let session = mock.af.session()            // new ephemeral session wired to the mock
 let configuration = mock.makeURLSessionConfiguration(base: .default) // or customize a base
-mock.configure(existingConfiguration)       // or wire an existing configuration in place
+let session = URLSession(configuration: configuration)               // Foundation-only path
+
+let alamoSession = mock.af.session()                                 // optional Alamofire convenience
+mock.configure(existingConfiguration)                                // or wire an existing configuration in place
 ```
 
 Alamofire conveniences are namespaced under `mock.af` (think RxSwift's `.rx`). The
@@ -133,19 +211,18 @@ Request flow:
 
 ```
 test code
-  → Alamofire Session  (encoding, validation, retry, serializers, interceptors)
-    → URLSession
-      → MockURLProtocol                      ← installed via protocolClasses
-        → MockServer.resolve(recorded)       ← routes evaluated LIFO
-          → MockResponse                     ← delivered to the URLProtocol client
-        ← URLSession                         ← redirects are followed through the mock too
-      ← Alamofire Session
+  → URLSession  (or an Alamofire Session on top of it)
+    → MockURLProtocol                      ← installed via protocolClasses
+      → MockServer.resolve(recorded)       ← routes evaluated LIFO
+        → MockResponse                     ← delivered to the URLProtocol client
+      ← URLSession                         ← redirects are followed through the mock too
   ← test code
 ```
 
 Because the response goes back through URLSession, everything downstream of the transport
-behaves normally: status-code validation, `RetryPolicy` retries (each attempt is recorded),
-response serializers, redirect handling, and event monitors.
+behaves normally. With an Alamofire session that includes status-code validation,
+`RetryPolicy` retries (each attempt is recorded), response serializers, redirect handling,
+and event monitors.
 
 ---
 
@@ -363,7 +440,7 @@ let retry = RetryPolicy(retryLimit: 3, exponentialBackoffScale: 0)
 let session = mock.af.session(configuration: base, interceptor: retry)
 ```
 
-Raw `URLSession` works too — no Alamofire required for the mock itself:
+The configuration API is Foundation-only, so a plain `URLSession` works just as well:
 
 ```swift
 let urlSession = URLSession(configuration: mock.makeURLSessionConfiguration())
