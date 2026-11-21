@@ -17,8 +17,8 @@ See CONTRIBUTING.md for the type/scope vocabulary.
 
 ## Verification
 
-- [ ] `make verify` passes locally
-- [ ] `make test-release` for changes touching concurrency, locking, or timing
+- [ ] `mise run verify` passes locally
+- [ ] `mise run test-release` for changes touching concurrency, locking, or timing
 - [ ] Tests cover the new or changed behavior
 
 ## Checklist

@@ -26,6 +26,10 @@ jobs:
     name: Test & publish
     runs-on: xcode-27
     timeout-minutes: 30
+    env:
+      # Only SwiftLint comes from mise; Swift and swift-format come from the Xcode
+      # image pinned below.
+      MISE_ENABLE_TOOLS: swiftlint
 
     steps:
       - name: Checkout
@@ -66,6 +70,21 @@ jobs:
             exit 1
           fi
           echo "Releasing ${GITHUB_REF_NAME}"
+
+      # Static checks run before any build: a tagged tree that does not lint or format
+      # must never be published.
+      - name: Install pinned tools
+        uses: jdx/mise-action@v5
+        with:
+          version: 2026.9.6
+          # Publishing jobs should not restore the tool cache; install the pin fresh.
+          cache: false
+
+      - name: Lint and format
+        run: mise run lint
+
+      - name: Build (release)
+        run: swift build -c release
 
       # A release is only as good as the tests behind it: never publish on a red suite.
       - name: Test (release)

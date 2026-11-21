@@ -4,11 +4,15 @@
 # check (`.swift-format`). Both must be clean; `--strict` makes SwiftLint treat
 # warnings as failures so a green run means zero findings.
 #
+# SwiftLint is pinned in `.mise.toml` and installed with `mise install`, so the
+# version used here is the version CI runs.
+#
 # Usage:
 #   scripts/lint.sh
 #
 # Environment:
-#   SWIFTLINT     Override the SwiftLint executable (default: `swiftlint`).
+#   SWIFTLINT     Override the SwiftLint executable (default: `swiftlint`, which
+#                 mise resolves to the pinned version).
 #   SWIFT_FORMAT  Forwarded to scripts/format.sh.
 #
 set -euo pipefail
@@ -16,28 +20,9 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
-# Resolve SwiftLint. A version-manager shim (mise/asdf/rtx) can shadow Homebrew's
-# install while no version is selected, in which case `swiftlint` exists but
-# cannot run — fall back to the Homebrew formula in that case.
-resolve_swiftlint() {
-    local candidate="${SWIFTLINT:-swiftlint}"
-    if command -v "$candidate" >/dev/null 2>&1 && "$candidate" version >/dev/null 2>&1; then
-        printf '%s\n' "$candidate"
-        return 0
-    fi
-    if command -v brew >/dev/null 2>&1; then
-        local brew_prefix
-        brew_prefix="$(brew --prefix swiftlint 2>/dev/null || true)"
-        if [[ -n "$brew_prefix" && -x "$brew_prefix/bin/swiftlint" ]]; then
-            printf '%s\n' "$brew_prefix/bin/swiftlint"
-            return 0
-        fi
-    fi
-    return 1
-}
-
-if ! swiftlint_bin="$(resolve_swiftlint)"; then
-    echo "error: swiftlint not found. Install it with 'brew install swiftlint'." >&2
+swiftlint_bin="${SWIFTLINT:-swiftlint}"
+if ! "$swiftlint_bin" version >/dev/null 2>&1; then
+    echo "error: swiftlint not found or not runnable. Run 'mise install' (pins 0.65.1)." >&2
     exit 1
 fi
 
