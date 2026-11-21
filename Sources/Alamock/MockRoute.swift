@@ -7,7 +7,7 @@ import Foundation
 
 /// A route registered on a ``MockServer``.
 ///
-/// Routes are created with ``MockServer/on(_:)-`` and are evaluated in reverse
+/// Routes are created with ``MockServer/on(_:)`` and are evaluated in reverse
 /// registration order: the most recently registered matching route wins. This makes it
 /// easy for a single test to override a route registered in `setUp()`.
 ///
@@ -229,7 +229,7 @@ public final class MockRoute: @unchecked Sendable, CustomStringConvertible {
 private struct MockResponder: Sendable {
     let respond: @Sendable (RecordedRequest) throws -> MockResponse
 
-    static let `default` = MockResponder { _ in MockResponse(statusCode: 200) }
+    static let `default` = MockResponder { _ in MockResponse(status: 200) }
 
     static func response(_ response: MockResponse) -> MockResponder {
         MockResponder { _ in response }

@@ -11,40 +11,40 @@ import Testing
 struct MockPathPatternTests {
     @Test func exactPath() {
         let pattern = MockPathPattern("/users/42")
-        #expect(pattern.match(path: "/users/42") == [:])
-        #expect(pattern.match(path: "/users/43") == nil)
+        #expect(pattern.captures(in: "/users/42") == [:])
+        #expect(pattern.captures(in: "/users/43") == nil)
     }
 
     @Test func namedSegmentCapture() {
         let pattern = MockPathPattern("/users/:id/posts/:postID")
         #expect(
-            pattern.match(path: "/users/42/posts/7")
+            pattern.captures(in: "/users/42/posts/7")
                 == ["id": "42", "postID": "7"]
         )
-        #expect(pattern.match(path: "/users/42/posts") == nil)
+        #expect(pattern.captures(in: "/users/42/posts") == nil)
     }
 
     @Test func singleWildcard() {
         let pattern = MockPathPattern("/files/*/metadata")
-        #expect(pattern.match(path: "/files/report/metadata") == [:])
-        #expect(pattern.match(path: "/files/report/v2/metadata") == nil)
+        #expect(pattern.captures(in: "/files/report/metadata") == [:])
+        #expect(pattern.captures(in: "/files/report/v2/metadata") == nil)
     }
 
     @Test func doubleWildcardMatchesRemainder() {
         let pattern = MockPathPattern("/files/**")
-        #expect(pattern.match(path: "/files/a/b/c.txt") == [:])
-        #expect(pattern.match(path: "/files") == [:])
+        #expect(pattern.captures(in: "/files/a/b/c.txt") == [:])
+        #expect(pattern.captures(in: "/files") == [:])
     }
 
     @Test func trailingSlashIsIgnored() {
         let pattern = MockPathPattern("/users/")
-        #expect(pattern.match(path: "/users") == [:])
-        #expect(pattern.match(path: "/users/") == [:])
+        #expect(pattern.captures(in: "/users") == [:])
+        #expect(pattern.captures(in: "/users/") == [:])
     }
 
     @Test func rootPattern() {
         let pattern = MockPathPattern("/")
-        #expect(pattern.match(path: "/") == [:])
+        #expect(pattern.captures(in: "/") == [:])
     }
 }
 

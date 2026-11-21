@@ -650,7 +650,7 @@ final class IntegrationTests {
     }
 
     @Test func unmatchedRequestCanFailWithError() async {
-        server.unmatchedRequestBehavior = .failWith(URLError(.notConnectedToInternet))
+        server.unmatchedRequestBehavior = .failWith(.notConnectedToInternet)
 
         do {
             _ = try await session.request("https://api.example.com/anything")

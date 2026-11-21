@@ -5,8 +5,8 @@
 
 /// A method and path pattern that identifies a route or a set of recorded requests.
 ///
-/// `RoutePattern` is the argument of ``MockServer/on(_:)-`` and the shorthand form of
-/// ``MockServer/verify(_:times:)-``. Build one from a static factory:
+/// `RoutePattern` is the argument of ``MockServer/on(_:)`` and the shorthand form of
+/// ``MockServer/verify(_:times:)``. Build one from a static factory:
 ///
 /// ```swift
 /// mock.on(.get("/users/:id")).respond(.json(["id": 42, "name": "Ada"]))
@@ -45,7 +45,9 @@ public struct RoutePattern: Hashable, Sendable {
     public static let any = RoutePattern()
 
     /// Matches any method against the given path pattern.
-    public static func any(_ path: String? = nil) -> RoutePattern {
+    ///
+    /// For a pattern that matches any method and any path, use `any` (the property).
+    public static func any(_ path: String?) -> RoutePattern {
         RoutePattern(path: path)
     }
 

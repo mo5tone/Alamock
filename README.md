@@ -336,7 +336,7 @@ Alternatives:
 ```swift
 mock.unmatchedRequestBehavior = .respond(.status(404))
 // or
-mock.unmatchedRequestBehavior = .failWith(URLError(.notConnectedToInternet))
+mock.unmatchedRequestBehavior = .failWith(.notConnectedToInternet)
 ```
 
 ## Multiple servers, existing sessions, and shared setups

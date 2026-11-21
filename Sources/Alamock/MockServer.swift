@@ -16,8 +16,8 @@ public enum UnmatchedRequestBehavior: Sendable {
     /// Respond with a fixed ``MockResponse``.
     case respond(MockResponse)
 
-    /// Fail the request with a transport-level error.
-    case failWith(URLError)
+    /// Fail the request with a transport-level error, e.g. ``URLError/notConnectedToInternet``.
+    case failWith(URLError.Code)
 }
 
 /// A stateful, pluggable mock HTTP server for Alamofire unit tests.
@@ -319,8 +319,8 @@ public final class MockServer: @unchecked Sendable {
             )
         case let .respond(response):
             return Resolution(request: request, response: response, error: nil)
-        case let .failWith(error):
-            return Resolution(request: request, response: nil, error: error)
+        case let .failWith(code):
+            return Resolution(request: request, response: nil, error: URLError(code))
         }
     }
 
