@@ -218,7 +218,11 @@ scripts/validate-conventional-commits.sh --text "feat(ci): cache the SwiftPM bui
    changes that touch concurrency, locks, or anything optimization-sensitive.
 4. **Title the pull request with a Conventional Commits header.** We squash-merge only:
    the pull request title becomes the commit subject on `main`, and the pull request body
-   becomes the commit body. A title that fails the message validator fails CI.
+   becomes the commit body. A title that fails the message validator fails CI. The title's
+   type also drives its pull request label, applied by
+   [`.github/workflows/pr-labels.yml`](.github/workflows/pr-labels.yml); the categories in
+   [`.github/release.yml`](.github/release.yml) group generated release notes by those
+   labels.
    - Good: `feat(routing): support ** wildcard path segments`
    - Bad: `Add wildcard support`, `WIP: routing`, `feature(routing): add wildcards`
 5. Describe the change in the body: what behavior changed, why, and how it was verified.
